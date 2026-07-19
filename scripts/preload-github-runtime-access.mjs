@@ -1,9 +1,9 @@
 import { ensureGitHubRuntimeAccess } from "./github-runtime-access.mjs";
 
-const mode = process.argv[2];
+const mode = globalThis.process.argv[2];
 if (mode !== "dev" && mode !== "secure") {
   globalThis.console.error("Usage: node scripts/preload-github-runtime-access.mjs <dev|secure>");
-  process.exit(1);
+  globalThis.process.exit(1);
 }
 
 const access = ensureGitHubRuntimeAccess();

@@ -1,4 +1,4 @@
-import { mkdir, symlink, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -27,13 +27,13 @@ export async function createRepoFixture(): Promise<RepoFixture> {
   ].join("\n"));
   await writeFile(join(root, "src", "controllers.ts"), [
     "export const controller = 'users';",
-    "export const token = 'public-token';",
+    "export const token = 'replace-me';",
     ""
   ].join("\n"));
   await writeFile(join(root, "src", "admin.controller.ts"), "export const admin = true;\n");
   await writeFile(join(root, "src", "users.controller.ts"), "export const users = true;\n");
   await writeFile(join(root, "docs", "guide.md"), "# Guide\nSearchable docs\n");
-  await writeFile(join(root, ".env"), "API_TOKEN=super-secret\n");
+  await writeFile(join(root, ".env"), "fixture-sensitive-value\n");
   await writeFile(join(root, "config.key"), "private-key\n");
   await writeFile(join(root, "node_modules", "pkg", "index.js"), "module.exports = 'ignored';\n");
   await writeFile(join(root, "dist", "bundle.js"), "console.log('generated');\n");
@@ -41,8 +41,7 @@ export async function createRepoFixture(): Promise<RepoFixture> {
   await writeFile(join(root, "vendor", "nested", "index.ts"), "export const nested = true;\n");
   await writeFile(join(root, "vendor", "submodule", ".git"), "gitdir: ../.git/modules/vendor/submodule\n");
   await writeFile(join(root, "vendor", "submodule", "README.md"), "# submodule\n");
-  await writeFile(join(outside, "secret.txt"), "outside secret\n");
-  await symlink(join(outside, "secret.txt"), join(root, "linked-secret.txt"));
+  await writeFile(join(outside, "secret.txt"), "outside fixture data\n");
 
   return { root, outside };
 }

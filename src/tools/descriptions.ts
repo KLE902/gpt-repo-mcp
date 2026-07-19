@@ -24,13 +24,13 @@ export const descriptions = {
   repo_remote_status:
     "Use this when the user asks whether a branch is pushed, whether a pull request exists, or whether GitHub checks have passed. Reads the configured GitHub remote and API without mutating local or remote state.",
   repo_write_push:
-    "Use this after a reviewed local commit as the routine next step in an authorized delivery workflow; no separate conversational approval is required for pushing the exact current feature branch and HEAD. Requires remote opt-in, a clean worktree, exact branch and HEAD guards, uses fixed git arguments, never force-pushes, and refuses direct push to main or master.",
+    "Use this when a reviewed local commit is ready for the routine next step in an authorized delivery workflow. No separate conversational approval is required for pushing the exact current feature branch and HEAD. Requires remote opt-in, a clean worktree, exact branch and HEAD guards, uses fixed git arguments, never force-pushes, and refuses direct push to main or master.",
   repo_write_pull_request:
-    "Use this after the exact current branch has been pushed as the routine next step in an authorized delivery workflow; no separate conversational approval is required to create or update its GitHub pull request. Requires remote opt-in, exact branch and HEAD guards, a GitHub remote, and runtime GitHub authentication for mutations.",
+    "Use this when the exact current branch has been pushed and its GitHub pull request should be created or updated as the routine next step in an authorized delivery workflow. No separate conversational approval is required. Requires remote opt-in, exact branch and HEAD guards, a GitHub remote, and runtime GitHub authentication for mutations.",
   repo_write_sync_base:
     "Use this when the user asks to update the local main/master base from its configured GitHub remote without switching branches. Uses only fast-forward pull when the base is checked out or a fixed fetch refspec otherwise; never rebases or force-updates.",
   repo_write_merge_pull_request:
-    "Use this only after the owner explicitly approves merging a specific GitHub pull request. Requires owner_approved true, exact local and PR head SHAs, remote merge opt-in, successful checks by default, and optionally fast-forwards the local base after GitHub confirms the merge.",
+    "Use this when the owner has explicitly approved merging a specific GitHub pull request. Requires owner_approved true, exact local and PR head SHAs, remote merge opt-in, successful checks by default, and optionally fast-forwards the local base after GitHub confirms the merge.",
   repo_git_stage:
     "Use this when compatibility with the git-prefixed staging alias is needed; prefer repo_write_stage for ChatGPT workflows. Stages explicit repo-relative paths only, requires user approval and expected HEAD, and never runs shell commands.",
   repo_git_unstage:

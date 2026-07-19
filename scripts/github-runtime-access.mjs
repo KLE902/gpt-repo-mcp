@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 const ACCESS_ENV_NAMES = ["GPT_REPO_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"];
 
 export function ensureGitHubRuntimeAccess(options = {}) {
-  const env = options.env ?? process.env;
+  const env = options.env ?? globalThis.process.env;
   const runGh = options.runGh ?? defaultRunGh;
 
   for (const name of ACCESS_ENV_NAMES) {

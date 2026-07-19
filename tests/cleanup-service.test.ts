@@ -144,7 +144,7 @@ describe("CleanupService", () => {
     const fixture = await createCleanupFixture({ includeSymlink: true });
     const service = createService(fixture.root);
 
-    await expect(service.cleanup({ paths: [".chatgpt/tool-tests/outside-link.txt"] })).rejects.toMatchObject({
+    await expect(service.cleanup({ paths: [".chatgpt/tool-tests/outside-link"] })).rejects.toMatchObject({
       code: "SYMLINK_ESCAPE_REJECTED"
     });
   });
@@ -214,11 +214,15 @@ async function createCleanupFixture(options: { includeSymlink?: boolean } = {}):
   await writeFile(join(root, ".chatgpt", "backups", "repo_write_file", "old.bak"), "backup\n");
   await writeFile(join(root, ".chatgpt", "codex-runs", "2026-06-04T081500Z-fix-login-expiry", "RESULT.md"), "# CODEX_RESULT\n");
   await writeFile(join(root, ".git", "config"), "[core]\n");
-  await writeFile(join(root, ".env"), "TOKEN=value\n");
+  await writeFile(join(root, ".env"), "fixture-sensitive-value\n");
   await writeFile(join(root, "docs", "notes.md"), "notes\n");
   await writeFile(join(outside, "outside.txt"), "outside\n");
   if (options.includeSymlink) {
-    await symlink(join(outside, "outside.txt"), join(root, ".chatgpt", "tool-tests", "outside-link.txt"));
+    await symlink(
+      outside,
+      join(root, ".chatgpt", "tool-tests", "outside-link"),
+      process.platform === "win32" ? "junction" : "dir"
+    );
   }
   return { root, outside };
 }

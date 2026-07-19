@@ -44,3 +44,6 @@ test-results/
 .idea/
 .vscode/
 .DS_Store
+
+# Local test output
+test-output.local.txt

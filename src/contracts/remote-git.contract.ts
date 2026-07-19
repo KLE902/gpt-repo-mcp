@@ -54,7 +54,7 @@ export const CreateBranchResultSchema = z.object({
 });
 
 export const RemoteStatusInputSchema = RepoInputSchema.extend({
-  remote: RemoteNameSchema.optional().default("origin"),
+  remote: RemoteNameSchema.optional().default("origin").describe("Configured Git remote name, normally origin."),
   pull_number: PullNumberSchema.optional().describe("Optional pull request to inspect; otherwise the open PR for the current branch is used when available.")
 });
 
@@ -80,7 +80,7 @@ export const RemoteStatusResultSchema = z.object({
 });
 
 export const PushInputSchema = RepoInputSchema.extend({
-  remote: RemoteNameSchema.optional().default("origin"),
+  remote: RemoteNameSchema.optional().default("origin").describe("Configured Git remote name, normally origin."),
   expected_branch: BranchNameSchema,
   expected_head_sha: ShaSchema,
   set_upstream: z.boolean().optional().default(true).describe("Whether to configure the pushed branch to track the remote branch."),
@@ -106,7 +106,7 @@ export const PushResultSchema = z.object({
 });
 
 export const PullRequestInputSchema = RepoInputSchema.extend({
-  remote: RemoteNameSchema.optional().default("origin"),
+  remote: RemoteNameSchema.optional().default("origin").describe("Configured Git remote name, normally origin."),
   expected_branch: BranchNameSchema,
   expected_head_sha: ShaSchema,
   base: BranchNameSchema.describe("Explicit pull request base branch, normally main or master."),
@@ -130,7 +130,7 @@ export const PullRequestResultSchema = z.object({
 });
 
 export const SyncBaseInputSchema = RepoInputSchema.extend({
-  remote: RemoteNameSchema.optional().default("origin"),
+  remote: RemoteNameSchema.optional().default("origin").describe("Configured Git remote name, normally origin."),
   base: BranchNameSchema.describe("Explicit local and remote base branch to synchronize, normally main or master."),
   expected_head_sha: ShaSchema,
   dry_run: z.boolean().optional().default(false).describe("Validate and inspect the remote base without changing local refs."),
@@ -152,7 +152,7 @@ export const SyncBaseResultSchema = z.object({
 });
 
 export const MergePullRequestInputSchema = RepoInputSchema.extend({
-  remote: RemoteNameSchema.optional().default("origin"),
+  remote: RemoteNameSchema.optional().default("origin").describe("Configured Git remote name, normally origin."),
   pull_number: PullNumberSchema,
   expected_head_sha: ShaSchema.describe("Expected current local HEAD SHA."),
   expected_pull_head_sha: ShaSchema.describe("Exact pull request head SHA that the owner reviewed and approved."),

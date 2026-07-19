@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-// @ts-ignore The startup helper is intentionally plain JavaScript and loaded directly by Node.
+// @ts-expect-error The startup helper is intentionally plain JavaScript and loaded directly by Node.
 import { ensureGitHubRuntimeAccess } from "../scripts/github-runtime-access.mjs";
 
 describe("GitHub runtime access", () => {
