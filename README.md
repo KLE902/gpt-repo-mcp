@@ -70,10 +70,12 @@ npm run connect
 Copy the printed URL:
 
 ```text
-ChatGPT MCP URL: https://<ngrok-host>/t/<random-token>/mcp
+ChatGPT MCP URL: https://<ngrok-host>/t/<stable-local-token>/mcp
 ```
 
 Paste it into ChatGPT Developer Mode connector settings, start a new chat, select the connector, and ask:
+
+`npm run connect` creates the path value once under your user profile and reuses it on later starts. It is outside Git and separate from GitHub authentication. The public ngrok host must also remain unchanged for the complete connector URL to stay valid.
 
 ```text
 Use GPT Repo MCP. Which repositories can you access?
@@ -229,8 +231,9 @@ Read the full model in [docs/SECURITY.md](docs/SECURITY.md).
 | --- | --- |
 | `npm run build` | Build the MCP server and CLI. |
 | `npm run doctor` | Check config, scripts, tunnel state, port use, and git status. |
-| `npm run connect` | Start the MCP server and try to use or reuse an ngrok HTTPS tunnel. |
+| `npm run connect` | Start the MCP server, reuse the stable user-local path value, and try to use or reuse an ngrok HTTPS tunnel. |
 | `npm run connect:secure` | Start the MCP server and OpenAI Secure MCP Tunnel. |
+| `npm run install:desktop-launcher` | Create a Windows desktop command file that starts `npm run connect` from this checkout. |
 | `npm run mcp` | Start only the local MCP server with `config.local.json`. |
 | `npm run tunnel` | Start only an ngrok tunnel to local port `8787`. |
 | `npm run list` | List approved repositories. |
@@ -263,7 +266,7 @@ New to ngrok? See [Install ngrok from zero](docs/SETUP.md#install-ngrok-from-zer
 ## Troubleshooting
 
 - Unknown `repo_id`: run `npm run list`.
-- Connector URL changed: restart `npm run connect` and update ChatGPT Developer Mode with the new printed URL.
+- Connector URL changed: the path value is stable across restarts; update ChatGPT only if the public tunnel host changed or the local path file was removed.
 - Write blocked: ask ChatGPT to run `repo_policy_explain` for the repo id and path.
 - Schema mismatch: refresh ChatGPT Developer Mode and run `npm test -- tests/mcp-contract.test.ts tests/tool-contracts.test.ts`.
 - Tunnel 502: confirm the local server is running, check `/health`, then restart ngrok or try a fresh tunnel.

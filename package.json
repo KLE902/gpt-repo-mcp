@@ -34,6 +34,7 @@
     "tunnel": "ngrok http 8787 --log=stdout",
     "connect": "node scripts/preload-github-runtime-access.mjs dev",
     "connect:secure": "node scripts/preload-github-runtime-access.mjs secure",
+    "install:desktop-launcher": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-desktop-launcher.ps1",
     "add": "node dist/cli/connect-gpt.js add",
     "remove": "node dist/cli/connect-gpt.js remove",
     "list": "node dist/cli/connect-gpt.js list",

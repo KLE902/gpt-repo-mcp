@@ -10,7 +10,7 @@ This guide gets a local GPT Repo MCP (`gpt-repo-mcp`) server configured for appr
 - ngrok for the built-in `npm run connect` convenience tunnel, or another HTTPS tunnel for manual setup
 - ChatGPT account with Developer Mode access
 
-ChatGPT cannot call `localhost` directly. The fastest OSS setup is `npm run connect`, which starts the local MCP server, starts or reuses ngrok, and prints a temporary public HTTPS URL ending in `/t/<random-token>/mcp`.
+ChatGPT cannot call `localhost` directly. The fastest OSS setup is `npm run connect`, which starts the local MCP server, starts or reuses ngrok, and prints a public HTTPS URL ending in `/t/<stable-local-token>/mcp`.
 
 ## Install ngrok from zero
 
@@ -55,7 +55,7 @@ Copy the account connection command from your ngrok dashboard and run it once in
 
 After ngrok is installed and connected to your account, use the normal quickstart: `npm run connect`.
 
-`npm run connect` starts the local MCP server on port `8787`, starts or reuses ngrok, and prints the ChatGPT connector URL ending in `/t/<random-token>/mcp`. You do not need to run `ngrok http 8787` yourself unless you are following the manual tunnel flow.
+`npm run connect` starts the local MCP server on port `8787`, starts or reuses ngrok, and prints the ChatGPT connector URL ending in `/t/<stable-local-token>/mcp`. The first run creates the value under the user profile and later runs reuse it. You do not need to run `ngrok http 8787` yourself unless you are following the manual tunnel flow.
 
 ## Install
 
@@ -130,10 +130,20 @@ Use the built-in convenience path first: `npm run connect`.
 This starts the local MCP server and tries to use or reuse ngrok. It should print:
 
 ```text
-ChatGPT MCP URL: https://<ngrok-host>/t/<random-token>/mcp
+ChatGPT MCP URL: https://<ngrok-host>/t/<stable-local-token>/mcp
 ```
 
-Paste the exact printed URL into ChatGPT Developer Mode connector settings. The random path token is guess-resistance only, not authentication. Anyone with the full URL can reach the endpoint while the tunnel is running. Treat public tunnel URLs as temporary local development endpoints and stop them between sessions.
+Paste the exact printed URL into ChatGPT Developer Mode connector settings. The path value is generated once under the current user's profile, reused across restarts, kept outside Git, and separate from GitHub credentials. It is guess-resistance only, not authentication. Anyone with the full URL can reach the endpoint while the tunnel is running. The connector URL still changes if the tunnel provider changes its public host.
+
+## Windows desktop launcher
+
+Run this once from the repository:
+
+```powershell
+npm run install:desktop-launcher
+```
+
+The installer creates `Start GPT Repo MCP.cmd` on the current user's Desktop and records the current repository path in that local launcher. Double-click it after Windows starts and keep the command window open while ChatGPT uses the connector. Use `npm run install:desktop-launcher -- -Force` to replace an existing launcher.
 
 ## Manual Tunnel Setup
 
@@ -159,7 +169,7 @@ For longer-lived or private connector setups, and for workspaces that support it
 
 ## How To Know It Worked
 
-- `npm run connect` prints an HTTPS URL ending in `/t/<random-token>/mcp`.
+- `npm run connect` prints an HTTPS URL ending in `/t/<stable-local-token>/mcp` and reuses the same local value on later starts.
 - Or `npm run connect:secure` starts the local MCP server and `tunnel-client`.
 - ChatGPT Developer Mode accepts the connector URL.
 - A new ChatGPT conversation can call the connector.
@@ -175,8 +185,9 @@ Use GPT Repo MCP. Which repositories can you access?
 | --- | --- |
 | `npm run build` | Build the MCP server and CLI. |
 | `npm run doctor` | Check local setup and tunnel readiness. |
-| `npm run connect` | Start the server and try to use or reuse ngrok. |
+| `npm run connect` | Start the server, stable local path value, and ngrok. |
 | `npm run connect:secure` | Start the server and OpenAI Secure MCP Tunnel. |
+| `npm run install:desktop-launcher` | Create the Windows desktop launcher for this checkout. |
 | `npm run mcp` | Start only the local MCP server. |
 | `npm run tunnel` | Start only the ngrok tunnel. |
 | `npm run list` | List approved repositories. |
@@ -229,8 +240,8 @@ PR creation, check inspection, and merge use runtime GitHub access. Startup firs
 - `config.local.json` is missing: run `cp config.example.json config.local.json`.
 - Unknown `repo_id`: run `npm run list`.
 - ChatGPT cannot connect through Secure MCP Tunnel: confirm `npm run connect:secure` is still running, refresh connector metadata, and verify the connector uses Tunnel.
-- ChatGPT cannot connect through a public tunnel: confirm the URL is public HTTPS and exactly matches the current `/t/<token>/mcp` URL.
-- Tunnel URL changed: update or refresh the ChatGPT connector.
+- ChatGPT cannot connect through a public tunnel: confirm the URL is public HTTPS and exactly matches the printed `/t/<token>/mcp` URL.
+- Connector URL changed: the local path value persists under the user profile; update or refresh the connector only when the public tunnel host changed or the local file was removed.
 - Port `8787` is busy: stop the process using it, then rerun `npm run connect`.
 - ngrok endpoint already online: `npm run connect` tries to reuse an existing HTTPS tunnel from the local ngrok API.
 - Schema mismatch in ChatGPT: refresh connector metadata, then run `npm test -- tests/tool-contracts.test.ts tests/mcp-contract.test.ts`.

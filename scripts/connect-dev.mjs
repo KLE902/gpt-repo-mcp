@@ -1,16 +1,16 @@
-import { randomBytes } from "node:crypto";
 import { access } from "node:fs/promises";
 import { constants } from "node:fs";
 import { spawn } from "node:child_process";
 import process from "node:process";
+import { loadOrCreatePublicPathToken } from "./public-path-token.mjs";
 
 const CONFIG_PATH = "./config.local.json";
 const PORT = "8787";
 const NGROK_API_URL = "http://127.0.0.1:4040/api/tunnels";
-const publicPathToken = randomBytes(16).toString("hex");
 
 const children = [];
 let shuttingDown = false;
+let publicPathSegment;
 
 function prefixOutput(stream, label) {
   let buffer = "";
@@ -69,9 +69,9 @@ function sleep(ms) {
 
 function printChatGptUrl(publicUrl) {
   const normalized = publicUrl.replace(/\/$/, "");
-  globalThis.console.log(`ChatGPT MCP URL: ${normalized}/t/${publicPathToken}/mcp`);
+  globalThis.console.log(`ChatGPT MCP URL: ${normalized}/t/${publicPathSegment}/mcp`);
   globalThis.console.log(
-    "This is guess-resistance only, not authentication. Anyone with the full URL can reach the endpoint while the tunnel is running. Stop with Ctrl+C when done."
+    "The stable path value is local guess-resistance, not authentication. It is separate from GitHub credentials and is never written to the repository. Anyone with the full URL can reach the endpoint while the tunnel is running. Stop with Ctrl+C when done."
   );
 }
 
@@ -101,7 +101,7 @@ async function announceNgrokUrl() {
   }
 
   globalThis.console.log(
-    `Could not auto-detect ngrok URL. Open http://127.0.0.1:4040 or look for the HTTPS forwarding URL in [tunnel] output and append /t/${publicPathToken}/mcp.`
+    `Could not auto-detect ngrok URL. Open http://127.0.0.1:4040 or look for the HTTPS forwarding URL in [tunnel] output and append /t/${publicPathSegment}/mcp.`
   );
 }
 
@@ -118,8 +118,8 @@ async function startProcesses() {
       GPT_REPO_CONFIG: CONFIG_PATH,
       REPO_READER_CONFIG: CONFIG_PATH,
       PORT,
-      GPT_REPO_PUBLIC_PATH_TOKEN: publicPathToken,
-      REPO_READER_PUBLIC_PATH_TOKEN: publicPathToken
+      GPT_REPO_PUBLIC_PATH_TOKEN: publicPathSegment,
+      REPO_READER_PUBLIC_PATH_TOKEN: publicPathSegment
     },
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -181,5 +181,13 @@ process.on("SIGINT", () => handleShutdown("SIGINT"));
 process.on("SIGTERM", () => handleShutdown("SIGTERM"));
 
 await ensureConfigExists();
+const pathState = await loadOrCreatePublicPathToken();
+publicPathSegment = pathState.value;
+if (pathState.source === "created") {
+  globalThis.console.log("Created a stable user-local MCP path value for future restarts.");
+} else if (pathState.source === "file") {
+  globalThis.console.log("Reusing the stable user-local MCP path value.");
+} else {
+  globalThis.console.log("Using the MCP path value supplied through the runtime environment.");
+}
 ensureNgrokAvailable();
-

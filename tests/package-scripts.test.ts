@@ -24,6 +24,9 @@ describe("package startup scripts", () => {
     expect(pkg.scripts?.tunnel).toContain("--log=stdout");
     expect(pkg.scripts?.connect).toBe("node scripts/preload-github-runtime-access.mjs dev");
     expect(pkg.scripts?.["connect:secure"]).toBe("node scripts/preload-github-runtime-access.mjs secure");
+    expect(pkg.scripts?.["install:desktop-launcher"]).toBe(
+      "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-desktop-launcher.ps1"
+    );
     expect(pkg.scripts?.add).toBe("node dist/cli/connect-gpt.js add");
     expect(pkg.scripts?.remove).toBe("node dist/cli/connect-gpt.js remove");
     expect(pkg.scripts?.list).toBe("node dist/cli/connect-gpt.js list");
@@ -34,15 +37,27 @@ describe("package startup scripts", () => {
     const scriptPath = join(process.cwd(), "scripts", "connect-dev.mjs");
     await expect(access(scriptPath)).resolves.toBeUndefined();
     const script = await readFile(scriptPath, "utf8");
-    expect(script).toContain("randomBytes(16)");
+    expect(script).toContain("loadOrCreatePublicPathToken");
+    expect(script).toContain("stable user-local MCP path value");
     expect(script).toContain("GPT_REPO_PUBLIC_PATH_TOKEN");
     expect(script).toContain("REPO_READER_PUBLIC_PATH_TOKEN");
-    expect(script).toContain("/t/${publicPathToken}/mcp");
-    expect(script).toContain("This is guess-resistance only, not authentication");
+    expect(script).toContain("/t/${publicPathSegment}/mcp");
+    expect(script).toContain("local guess-resistance, not authentication");
     expect(script).toContain("127.0.0.1:4040/api/tunnels");
     expect(script).toContain("ChatGPT MCP URL");
     expect(script).toContain("Reusing existing ngrok tunnel");
     expect(script).toContain("readNgrokHttpsUrl");
+  });
+
+  test("includes a Windows desktop launcher installer", async () => {
+    const installerPath = join(process.cwd(), "scripts", "install-desktop-launcher.ps1");
+    await expect(access(installerPath)).resolves.toBeUndefined();
+    const installer = await readFile(installerPath, "utf8");
+    expect(installer).toContain("DesktopDirectory");
+    expect(installer).toContain("Start GPT Repo MCP.cmd");
+    expect(installer).toContain("npm.cmd run connect");
+    expect(installer).toContain("Keep the window open");
+
   });
 
   test("includes secure tunnel startup script and env example", async () => {
