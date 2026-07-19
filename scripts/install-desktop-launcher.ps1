@@ -1,8 +1,12 @@
 [CmdletBinding()]
 param(
-    [string]$RepoPath = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
+    [string]$RepoPath,
     [switch]$Force
 )
+
+if ([string]::IsNullOrWhiteSpace($RepoPath)) {
+    $RepoPath = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+}
 
 $ErrorActionPreference = "Stop"
 
