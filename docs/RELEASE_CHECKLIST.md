@@ -64,4 +64,4 @@ git diff --check
 - Verify read tools remain read-only.
 - Verify mutating tools remain disabled by default.
 - Verify no shell execution or arbitrary command runner was added.
-- Verify no push, pull, reset, checkout, switch, rebase, merge, stash, clean, force, branch deletion, or arbitrary git command tool was added.
+- Verify delivery tools remain fixed-purpose: new-branch creation must use exact source branch/HEAD guards and reject existing branches; remote tools must remain `origin`-only. Verify no arbitrary Git command, force-push, direct base push, reset, existing-branch switch, rebase, stash, `git clean`, or branch-deletion path was added.

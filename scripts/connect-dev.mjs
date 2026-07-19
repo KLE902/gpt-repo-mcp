@@ -107,8 +107,12 @@ async function announceNgrokUrl() {
 
 async function startProcesses() {
   globalThis.console.log("Use the HTTPS ngrok URL with the printed /t/<token>/mcp path in ChatGPT Developer Mode.");
+  const npmCli = process.env.npm_execpath;
+  if (!npmCli) {
+    throw new Error("npm_execpath is missing. Start with npm run connect.");
+  }
 
-  const mcp = spawn("npm", ["run", "dev"], {
+  const mcp = spawn(process.execPath, [npmCli, "run", "dev"], {
     env: {
       ...process.env,
       GPT_REPO_CONFIG: CONFIG_PATH,
@@ -178,3 +182,4 @@ process.on("SIGTERM", () => handleShutdown("SIGTERM"));
 
 await ensureConfigExists();
 ensureNgrokAvailable();
+

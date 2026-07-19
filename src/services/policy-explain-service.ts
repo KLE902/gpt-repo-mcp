@@ -5,7 +5,7 @@ import type { RepoConfig } from "./root-registry.js";
 import { IgnoreEngine } from "./ignore-engine.js";
 import { validateRepoPath } from "./path-sandbox.js";
 import { WritePolicy } from "./write-policy.js";
-import { OperationsPolicy } from "./operations-policy.js";
+import { OperationsPolicy, type OperationsPolicyConfig } from "./operations-policy.js";
 
 export type PolicyExplainOptions = {
   path?: string;
@@ -23,7 +23,7 @@ type Decision = {
 export class PolicyExplainService {
   private readonly ignoreEngine = new IgnoreEngine();
 
-  constructor(private readonly repo: RepoConfig) {}
+  constructor(private readonly repo: Omit<RepoConfig, "operations"> & { operations?: OperationsPolicyConfig }) {}
 
   explain(options: PolicyExplainOptions) {
     const pathResult = options.path ? normalizeForPolicy(options.path) : undefined;
@@ -38,6 +38,11 @@ export class PolicyExplainService {
       enabled: operationsPolicy.config.enabled,
       git_stage_enabled: operationsPolicy.config.git_stage_enabled,
       git_commit_enabled: operationsPolicy.config.git_commit_enabled,
+      git_branch_enabled: operationsPolicy.config.git_branch_enabled,
+      git_push_enabled: operationsPolicy.config.git_push_enabled,
+      github_pull_request_enabled: operationsPolicy.config.github_pull_request_enabled,
+      github_merge_enabled: operationsPolicy.config.github_merge_enabled,
+      git_sync_enabled: operationsPolicy.config.git_sync_enabled,
       cleanup_enabled: operationsPolicy.config.cleanup_enabled,
       max_paths_per_operation: operationsPolicy.config.max_paths_per_operation
     };

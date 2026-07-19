@@ -91,9 +91,9 @@ npm run add -- /path/to/your/repo --mode ship
 
 - `read`: read-only tools.
 - `write`: read tools plus broad repo-local writes guarded by hard denied paths, secret checks, path sandboxing, and size limits.
-- `ship`: write mode plus local git stage, commit, recover, and cleanup operations.
+- `ship`: write mode plus bounded new feature-branch creation, local Git operations, and the GitHub `origin` workflow.
 
-No mode enables push, pull, reset, checkout, switch, rebase, merge, stash, clean, force, branch deletion, shell execution, or arbitrary command execution.
+No mode enables unrestricted Git or shell execution. Force-push, direct push to `main`/`master`, switching to an existing branch, reset, rebase, stash, `git clean`, and branch deletion remain unavailable. `ship` adds only fixed creation of a brand-new feature branch plus the bounded remote tools.
 
 Permission mode summary:
 
@@ -101,7 +101,7 @@ Permission mode summary:
 | --- | --- |
 | `read` | Read-only repository tools; writes and local operations stay disabled. |
 | `write` | Read tools plus broad repo-local writes guarded by hard denied paths, secret checks, path sandboxing, and size limits. |
-| `ship` | Same write policy as `write`, plus local stage, commit, recover, and cleanup operations. |
+| `ship` | Same write policy as `write`, plus bounded new feature-branch creation, local stage/commit/recovery, and the GitHub `origin` workflow. |
 
 ## List Repositories
 
@@ -204,6 +204,11 @@ Enable them per repo in `config.local.json`:
         "enabled": true,
         "git_stage_enabled": true,
         "git_commit_enabled": true,
+        "git_branch_enabled": true,
+        "git_push_enabled": true,
+        "github_pull_request_enabled": true,
+        "github_merge_enabled": true,
+        "git_sync_enabled": true,
         "cleanup_enabled": true
       }
     }
@@ -211,9 +216,13 @@ Enable them per repo in `config.local.json`:
 }
 ```
 
-Write, git, and cleanup actions are still policy-limited. ChatGPT will ask for confirmation for mutating tool calls unless you choose to remember approval for the conversation.
+Write, Git, and cleanup actions remain policy-limited. ChatGPT may ask for client-level confirmation for mutating tool calls unless approval is remembered for the conversation; that UI confirmation is separate from the project decision model. Within an authorized delivery task, routine work may create a new feature branch from the exact current branch/HEAD, commit, push, and create or update the PR without a separate conversational approval. PR merge still requires an explicit owner decision.
 
-If a read, write, or cleanup path is unexpectedly blocked, ask ChatGPT to run `repo_policy_explain` with the repo id and path. It explains read/write/cleanup policy decisions and local git operation toggles without reading or mutating files.
+If a read, write, or cleanup path is unexpectedly blocked, ask ChatGPT to run `repo_policy_explain` with the repo id and path. It explains read/write/cleanup policy decisions and all local/remote operation toggles without reading or mutating files.
+
+## GitHub Runtime Access
+
+PR creation, check inspection, and merge use a runtime GitHub access value from `GPT_REPO_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN`. Keep the real value outside the repository and inject it into the MCP server process. Git push authentication is separate and uses the host's Git credential manager or SSH agent. Local commits prefer the existing Windows Git identity. When no complete identity is configured, server bootstrap creates an isolated runtime Git home under local application data and uses `GPT_REPO_GIT_AUTHOR_NAME` and `GPT_REPO_GIT_AUTHOR_EMAIL` when supplied, otherwise `GPT Repo MCP <gpt-repo-mcp@local.invalid>`. Repository and global Git configuration are not modified. After changing operation policy or runtime environment variables, restart the MCP server and reconnect the ChatGPT app so the new tool surface and permissions are loaded.
 
 ## Common Failure Modes
 

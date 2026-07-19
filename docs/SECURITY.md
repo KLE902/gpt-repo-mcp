@@ -16,7 +16,7 @@ Mutating tools use separate write annotations:
 - `openWorldHint: false`
 - `idempotentHint: false`
 
-No shell execution tools, arbitrary command runners, direct Codex execution tools, push/pull/reset/checkout/switch/rebase/merge/stash/clean tools, force operations, or branch deletion tools are registered. Safe local git staging and commit tools use fixed `git` argument arrays through `execFile`; they are not arbitrary git command runners. Advisory tools such as `repo_change_plan` and `repo_next_action` return plans and recommendations only; they do not write files or run tests.
+No shell execution tools, arbitrary command runners, direct Codex execution tools, arbitrary Git tools, force operations, or branch-deletion tools are registered. Local Git tools and the bounded remote tools use fixed `git` argument arrays through `execFile`; GitHub PR/check/merge calls use explicit REST endpoints. On Windows, server bootstrap first reuses a complete user-level Git identity. When none exists, it creates an isolated runtime Git home under local application data using optional `GPT_REPO_GIT_AUTHOR_NAME`/`GPT_REPO_GIT_AUTHOR_EMAIL` values or a deterministic `local.invalid` fallback. Repository and global Git configuration remain unchanged. Advisory tools such as `repo_change_plan` and `repo_next_action` return plans and recommendations only; they do not write files or run tests.
 
 Codex task tools do not run Codex or execute commands. `repo_prepare_codex_task` renders a prompt in tool output, `repo_write_codex_task` writes local prompt metadata under `.chatgpt/codex-runs/` through the normal write policy, and `repo_codex_review` reads the run result plus git review state. The user remains responsible for running Codex separately.
 
@@ -58,9 +58,9 @@ The CLI permission modes are config shortcuts only:
 
 - `read`: writes and operations disabled.
 - `write`: broad repo-local file edits enabled under write policy, with hard denied paths and secret checks still enforced.
-- `ship`: write mode plus local git stage, commit, recover, and cleanup operations.
+- `ship`: write mode plus bounded creation of a new local feature branch, local Git operations, and the GitHub `origin` workflow: feature-branch push, PR create/update/status, owner-approved PR merge, and fast-forward base synchronization.
 
-No mode enables shell execution, arbitrary command execution, push, pull, reset, checkout, switch, rebase, merge, stash, clean, force, or branch deletion.
+No mode enables shell execution, arbitrary command execution, force-push, direct push to `main`/`master`, unrestricted pull/merge, reset, switching to an existing branch, rebase, stash, `git clean`, or branch deletion. `repo_write_create_branch` is the only branch-changing exception: it uses fixed `git switch -c <new-branch>` after exact source-branch and HEAD validation, rejects `main`/`master` and any existing local branch, and preserves HEAD. Remote operations use fixed arguments and GitHub REST endpoints, require separate opt-in toggles, and are restricted to `origin`.
 
 Default allowed write globs are `.chatgpt/**`, `.codex/**`, `docs/**`, exact root public docs (`README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `SUPPORT.md`, `LICENSE`), and exact `.gitignore`. This is not a general root-write allowance; root files such as `package.json`, source files, scripts, tests, and arbitrary notes remain blocked unless the repo opts in with custom allow globs. The `.gitignore` allowance is a narrow repo-metadata path for adding local-only ignore policy. Default denied write globs include real env files, private key files, Git internals, root and nested dependency directories, common generated/cache directories, coverage, test results, and virtual environments. Denied globs and hard secret-candidate checks win over allowed globs.
 
@@ -72,9 +72,13 @@ Clone-based `npm run add -- <path> --mode write` and `--mode ship` intentionally
 
 ## Operations Policy
 
-Local git operations are disabled by default for every repo. A repo must opt in with `operations.enabled: true`, `operations.git_stage_enabled: true`, and `operations.git_commit_enabled: true` as appropriate.
+All Git operations are disabled by default for every repo. New feature-branch creation, local stage/commit, push, PR create/update, PR merge, base synchronization, and cleanup each have explicit operation-policy toggles. `operations.enabled: true` is necessary but not sufficient.
 
 `repo_git_stage` and `repo_git_unstage` accept only explicit repo-relative POSIX paths and require `expected_head_sha`. They reject empty path lists, `.`, `*`, shell-like pathspecs, absolute paths, traversal, `.git`, real environment files, private key/certificate files, identity key filenames, and directories literally named `secrets` or `credentials`. Legitimate code, docs, and tests whose filenames contain words like `secret` or `credential` are allowed when the path is explicit and otherwise safe. Actual staging uses fixed `git add -- <paths>` arguments, and actual unstaging uses fixed `git restore --staged -- <paths>` arguments.
+
+`repo_write_create_branch` requires `git_branch_enabled`, the exact current source branch, and the exact current HEAD. It validates the target with `git check-ref-format --branch`, refuses `main`, `master`, the current branch, and any existing local branch, then uses only fixed `git switch -c <new-branch>`. A dirty index/worktree is allowed so already reviewed staged or unstaged work can move off the base branch; the result reports that state with `WORKTREE_CHANGES_CARRIED_TO_NEW_BRANCH`. The operation verifies afterward that the new branch is active and HEAD is unchanged.
+
+Remote tools accept only the remote name `origin` and GitHub.com HTTPS/SSH repository URLs without embedded credentials. Push requires a clean named feature branch, an exact expected branch and HEAD, and a fixed non-force refspec. Direct push to `main` and `master` is rejected. PR merge requires the exact reviewed PR head SHA and an explicit `owner_approved: true`; known checks must be successful unless the caller deliberately disables that guard. Base synchronization is fast-forward only.
 
 Public environment template files can be staged only through a narrow filename allowlist: `.env.example`, `.env.sample`, `.env.template`, and `example.env`. These files are still read and scanned for secret-looking values before staging or commit validation. Real environment files such as `.env`, `.env.local`, and `.env.production` remain blocked.
 

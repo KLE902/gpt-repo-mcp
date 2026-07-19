@@ -24,6 +24,7 @@ import { FileWriter } from "../services/file-writer.js";
 import { WriteChangesService } from "../services/write-changes-service.js";
 import { WritePolicy } from "../services/write-policy.js";
 import { OperationReceiptService } from "../services/operation-receipt-service.js";
+import { RemoteGitService } from "../services/remote-git-service.js";
 import { createErrorEnvelope, createSuccessEnvelope } from "../runtime/result-envelope.js";
 import { toRepoReaderError } from "../runtime/errors.js";
 import { audit } from "../runtime/telemetry.js";
@@ -44,6 +45,7 @@ import type { GitCommitInput, GitRecoverInput, GitRestorePathsInput, GitStageCom
 import type { GitReviewInput } from "../contracts/git-review.contract.js";
 import type { CleanupPathsInput } from "../contracts/cleanup.contract.js";
 import type { HandoffInput } from "../contracts/handoff.contract.js";
+import type { CreateBranchInput, MergePullRequestInput, PullRequestInput, PushInput, RemoteStatusInput, SyncBaseInput } from "../contracts/remote-git.contract.js";
 
 type RepoInput = { repo_id: string };
 type ReadManyInput = RepoInput & {
@@ -141,6 +143,48 @@ export const gitReviewHandler: ToolHandler = async (input, context) => safeTool<
   const result = await new GitReviewService(repo.root, new OperationsPolicy(repo.operations)).review(args);
   audit({ tool: "repo_git_review", repo_id: args.repo_id, counts: { changed: result.changed_paths.length, recommended: result.recommendation.recommended_stage_paths.length }, truncated: result.diff_summary.truncated, warnings: result.recommendation.warnings });
   return createSuccessEnvelope(result, result.clean ? "Repository is clean." : `Reviewed ${result.changed_paths.length} changed paths.`);
+});
+
+export const writeCreateBranchHandler: ToolHandler = async (input, context) => safeTool<CreateBranchInput>("repo_write_create_branch", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await new RemoteGitService(repo.root, new OperationsPolicy(repo.operations)).createBranch(args);
+  audit({ tool: "repo_write_create_branch", repo_id: args.repo_id, warnings: result.warnings });
+  return createSuccessEnvelope(result, result.dry_run ? `Dry run validated creation of ${result.branch} from ${result.source_branch}.` : `Created and switched to ${result.branch} at ${result.head_sha}.`, { warnings: result.warnings });
+});
+
+export const remoteStatusHandler: ToolHandler = async (input, context) => safeTool<RemoteStatusInput>("repo_remote_status", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await new RemoteGitService(repo.root, new OperationsPolicy(repo.operations)).status(args);
+  audit({ tool: "repo_remote_status", repo_id: args.repo_id, counts: { checks: result.checks?.total ?? 0 }, warnings: result.warnings });
+  return createSuccessEnvelope(result, result.pull_request ? `Remote branch and pull request #${result.pull_request.number} inspected.` : "Remote branch inspected; no matching pull request was returned.", { warnings: result.warnings });
+});
+
+export const writePushHandler: ToolHandler = async (input, context) => safeTool<PushInput>("repo_write_push", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await new RemoteGitService(repo.root, new OperationsPolicy(repo.operations)).push(args);
+  audit({ tool: "repo_write_push", repo_id: args.repo_id, warnings: result.warnings });
+  return createSuccessEnvelope(result, result.dry_run ? `Dry run validated push of ${result.branch}.` : `Pushed ${result.branch} at ${result.head_sha}.`, { warnings: result.warnings });
+});
+
+export const writePullRequestHandler: ToolHandler = async (input, context) => safeTool<PullRequestInput>("repo_write_pull_request", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await new RemoteGitService(repo.root, new OperationsPolicy(repo.operations)).pullRequest(args);
+  audit({ tool: "repo_write_pull_request", repo_id: args.repo_id, warnings: result.warnings });
+  return createSuccessEnvelope(result, result.pull_request ? `${result.action} pull request #${result.pull_request.number}.` : `${result.action} pull request for ${result.branch}.`, { warnings: result.warnings });
+});
+
+export const writeSyncBaseHandler: ToolHandler = async (input, context) => safeTool<SyncBaseInput>("repo_write_sync_base", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await new RemoteGitService(repo.root, new OperationsPolicy(repo.operations)).syncBase(args);
+  audit({ tool: "repo_write_sync_base", repo_id: args.repo_id, warnings: result.warnings });
+  return createSuccessEnvelope(result, result.dry_run ? `Dry run validated synchronization of ${result.base}.` : `Synchronized local ${result.base} with ${result.remote}/${result.base}.`, { warnings: result.warnings });
+});
+
+export const writeMergePullRequestHandler: ToolHandler = async (input, context) => safeTool<MergePullRequestInput>("repo_write_merge_pull_request", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await new RemoteGitService(repo.root, new OperationsPolicy(repo.operations)).mergePullRequest(args);
+  audit({ tool: "repo_write_merge_pull_request", repo_id: args.repo_id, counts: { checks: result.checks.total }, warnings: result.warnings });
+  return createSuccessEnvelope(result, result.dry_run ? `Dry run validated merge of pull request #${result.pull_request.number}.` : `Merged pull request #${result.pull_request.number}.`, { warnings: result.warnings });
 });
 
 export const gitStageHandler: ToolHandler = async (input, context) => safeTool<GitStageInput>("repo_git_stage", input, context, async (args) => {

@@ -91,9 +91,23 @@ Clone -> Install -> Add repo -> Choose mode -> Connect ChatGPT -> Start working
 | --- | --- | --- |
 | `read` | First install, project review, cautious exploration | Inspect repo structure, search/read files, review git status and diffs, plan work. |
 | `write` | Daily implementation help | Everything in `read`, plus repo file writes guarded by policy, path checks, secret checks, and size limits. |
-| `ship` | Local commit prep | Everything in `write`, plus local stage, commit, recover, and cleanup operations after approval. |
+| `ship` | Reviewed GitHub delivery | Everything in `write`, plus bounded new feature-branch creation, local stage/commit/recovery, and the `origin` push, pull-request, owner-approved merge, and fast-forward base-sync tools. |
 
-No mode enables push, pull, reset, checkout, switch, rebase, merge, stash, force, branch deletion, shell execution, or arbitrary command execution.
+No mode enables arbitrary shell or Git execution, force-push, direct push to `main`/`master`, switching to an existing branch, reset, rebase, stash, branch deletion, or unrestricted remote access. `ship` adds only fixed-purpose creation of a new feature branch plus the bounded GitHub workflow described below.
+
+## Reviewed GitHub Workflow
+
+`ship` mode enables an end-to-end but deliberately narrow delivery path:
+
+1. When work starts on a base branch, create and switch to a new feature branch with `repo_write_create_branch`, guarded by the exact current branch and HEAD. Reviewed staged or unstaged work may be carried onto that new branch.
+2. Review and commit locally with `repo_git_review` and `repo_write_stage_commit`, or the granular stage/commit tools when changes are already staged.
+3. Push the exact clean feature branch and reviewed HEAD with `repo_write_push`.
+4. Create or update its GitHub pull request with `repo_write_pull_request`.
+5. Inspect PR state and checks with `repo_remote_status`.
+6. Merge only after explicit owner approval with `repo_write_merge_pull_request`; the exact reviewed PR head SHA is mandatory and checks must pass by default.
+7. Fast-forward the local base with `repo_write_sync_base`, or let the merge tool attempt it after GitHub confirms success.
+
+All remote tools are restricted to the configured `origin` on GitHub.com. Push never uses force and refuses `main` or `master`. GitHub API mutations use `GPT_REPO_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN` from the MCP server environment; Git push authentication uses the machine's configured credential manager or SSH agent.
 
 ## Example ChatGPT Prompts
 
@@ -145,7 +159,8 @@ Codex is done. Review the Codex result and the git diff for <repo_id>.
 | Git review | `repo_git_status`, `repo_git_diff`, `repo_git_review` |
 | File writes | `repo_write_file`, `repo_write_changes` |
 | ChatGPT session continuity | `repo_write_handoff`, `repo_last_write` |
-| Local ship flow | `repo_write_stage`, `repo_write_unstage`, `repo_write_commit`, `repo_write_stage_commit`, `repo_write_recover`, `repo_cleanup_paths` |
+| Local ship flow | `repo_write_create_branch`, `repo_write_stage`, `repo_write_unstage`, `repo_write_commit`, `repo_write_stage_commit`, `repo_write_recover`, `repo_cleanup_paths` |
+| GitHub remote flow | `repo_remote_status`, `repo_write_push`, `repo_write_pull_request`, `repo_write_merge_pull_request`, `repo_write_sync_base` |
 | Compatibility aliases | `repo_git_stage`, `repo_git_unstage`, `repo_git_commit` |
 | Codex/Claude coordination | `repo_prepare_codex_task`, `repo_write_codex_task`, `repo_codex_review` |
 
@@ -203,8 +218,8 @@ GPT Repo MCP is intentionally not a shell runner.
 - ChatGPT works through named repository ids and repo-relative paths.
 - Mutating tools are disabled until a repo opts in.
 - File writes are checked against allow/deny policy, path sandboxing, size limits, and secret scanning.
-- Git tools operate only on explicit paths and local commits.
-- There are no tools for push, pull, reset, checkout, switch, rebase, merge, stash, force, branch deletion, shell execution, or arbitrary command execution.
+- Local Git tools operate only on explicit paths and local commits; remote tools use fixed Git arguments and GitHub REST endpoints.
+- There are no generic push/pull/merge, reset, checkout, branch-switch, rebase, stash, force, branch-deletion, shell, or arbitrary-command tools. The only branch-changing tool creates and switches to a brand-new feature branch from an exact reviewed source branch and HEAD. Remote delivery is limited to `origin`, feature-branch push, GitHub PR operations, owner-approved PR merge, and fast-forward base synchronization.
 
 Read the full model in [docs/SECURITY.md](docs/SECURITY.md).
 

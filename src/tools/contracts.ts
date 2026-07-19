@@ -12,6 +12,7 @@ import { NextActionInputSchema, NextActionResultSchema } from "../contracts/next
 import { LastWriteInputSchema, LastWriteResultSchema } from "../contracts/operation-receipt.contract.js";
 import { PolicyExplainInputSchema, PolicyExplainResultSchema } from "../contracts/policy.contract.js";
 import { ProjectBriefInputSchema, ProjectBriefResultSchema } from "../contracts/project.contract.js";
+import { CreateBranchInputSchema, CreateBranchResultSchema, MergePullRequestInputSchema, MergePullRequestResultSchema, PullRequestInputSchema, PullRequestResultSchema, PushInputSchema, PushResultSchema, RemoteStatusInputSchema, RemoteStatusResultSchema, SyncBaseInputSchema, SyncBaseResultSchema } from "../contracts/remote-git.contract.js";
 import { RepoInputSchema, RepoListResultSchema, RepoTreeInputSchema } from "../contracts/repo.contract.js";
 import { PlanReviewInputSchema, PlanReviewResultSchema } from "../contracts/review.contract.js";
 import { SearchInputSchema, SearchResponseSchema } from "../contracts/search.contract.js";
@@ -30,6 +31,12 @@ export type ToolName =
   | "repo_git_status"
   | "repo_git_diff"
   | "repo_git_review"
+  | "repo_write_create_branch"
+  | "repo_remote_status"
+  | "repo_write_push"
+  | "repo_write_pull_request"
+  | "repo_write_sync_base"
+  | "repo_write_merge_pull_request"
   | "repo_git_stage"
   | "repo_git_unstage"
   | "repo_git_restore_paths"
@@ -98,6 +105,30 @@ export const toolContracts = {
   repo_git_review: {
     input: GitReviewInputSchema,
     output: GitReviewResultSchema
+  },
+  repo_write_create_branch: {
+    input: CreateBranchInputSchema,
+    output: CreateBranchResultSchema
+  },
+  repo_remote_status: {
+    input: RemoteStatusInputSchema,
+    output: RemoteStatusResultSchema
+  },
+  repo_write_push: {
+    input: PushInputSchema,
+    output: PushResultSchema
+  },
+  repo_write_pull_request: {
+    input: PullRequestInputSchema,
+    output: PullRequestResultSchema
+  },
+  repo_write_sync_base: {
+    input: SyncBaseInputSchema,
+    output: SyncBaseResultSchema
+  },
+  repo_write_merge_pull_request: {
+    input: MergePullRequestInputSchema,
+    output: MergePullRequestResultSchema
   },
   repo_git_stage: {
     input: GitStageInputSchema,

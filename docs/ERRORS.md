@@ -50,6 +50,29 @@ All tool errors return:
 | `OPERATIONS_DISABLED` | A git or cleanup operation was requested without `operations.enabled`. |
 | `GIT_STAGE_DISABLED` | Git stage or unstage was requested without stage operations enabled. |
 | `GIT_COMMIT_DISABLED` | Git commit was requested without commit operations enabled. |
+| `GIT_BRANCH_CREATE_DISABLED` | New feature-branch creation was requested without `operations.git_branch_enabled`. |
+| `GIT_PUSH_DISABLED` | Push was requested without `operations.git_push_enabled`. |
+| `GITHUB_PULL_REQUEST_DISABLED` | Pull-request creation or update was requested without its operation toggle. |
+| `GITHUB_MERGE_DISABLED` | Pull-request merge was requested without its operation toggle. |
+| `GIT_SYNC_DISABLED` | Local base synchronization was requested without its operation toggle. |
+| `GIT_WORKTREE_DIRTY` | A remote mutation or base synchronization that requires a clean repository found staged or unstaged changes. New-branch creation is the deliberate exception. |
+| `GIT_BRANCH_MISMATCH` | Current branch did not match the supplied exact expected branch. |
+| `GIT_BRANCH_INVALID` | A supplied branch name was invalid or was an explicitly prohibited base-branch target. |
+| `GIT_BRANCH_EXISTS` | `repo_write_create_branch` was asked to create a local branch that already exists. The tool never switches to existing branches. |
+| `GIT_BRANCH_CREATE_FAILED` | Git did not leave the repository on the expected new branch with unchanged HEAD. |
+| `GIT_DETACHED_HEAD` | A delivery operation requires a named current branch but the repository is detached. |
+| `GIT_REMOTE_NOT_GITHUB` | The configured remote was not a supported credential-free GitHub HTTPS or SSH repository URL. |
+| `GIT_REMOTE_NOT_ALLOWED` | A remote other than the configured `origin` was requested. |
+| `GIT_DIRECT_BASE_PUSH_BLOCKED` | Push to `main` or `master` was rejected; use a feature branch and pull request. |
+| `GIT_REMOTE_HEAD_MISMATCH` | The remote feature-branch SHA did not match the exact local HEAD required by push or pull-request workflow. |
+| `GIT_REMOTE_BRANCH_NOT_FOUND` | The requested remote base branch was not found during synchronization. |
+| `GITHUB_AUTH_REQUIRED` | A GitHub API operation required a runtime token that was not supplied to the MCP server process. |
+| `GITHUB_API_ERROR` | A GitHub API request failed and was returned as a sanitized error. |
+| `GITHUB_PR_HEAD_MISMATCH` | The pull-request head changed after owner review. Review the new head before merging. |
+| `GITHUB_PR_NOT_OPEN` | The requested pull request is not open for this merge workflow. |
+| `GITHUB_PR_NOT_MERGEABLE` | GitHub reports that the pull request cannot currently be merged. |
+| `GITHUB_CHECKS_NOT_PASSED` | Required known checks were not successful, so merge was not attempted. |
+| `GITHUB_MERGE_REJECTED` | GitHub rejected the requested pull-request merge. |
 | `GIT_HEAD_MISMATCH` | Current HEAD did not match the supplied `expected_head_sha`. |
 | `GIT_OPERATION_PATHS_REQUIRED` | A git operation requiring explicit paths received an empty path list. |
 | `GIT_OPERATION_TOO_MANY_PATHS` | A git operation exceeded `operations.max_paths_per_operation`. |

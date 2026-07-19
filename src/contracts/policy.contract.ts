@@ -27,9 +27,14 @@ export const PolicyExplainResultSchema = z.object({
     enabled: z.boolean().describe("Whether local repository operations are enabled."),
     git_stage_enabled: z.boolean().describe("Whether local git stage and unstage operations are enabled."),
     git_commit_enabled: z.boolean().describe("Whether local git commit operations are enabled."),
+    git_branch_enabled: z.boolean().describe("Whether creating and switching to a new local feature branch is enabled."),
+    git_push_enabled: z.boolean().describe("Whether non-force push of the exact current feature branch is enabled."),
+    github_pull_request_enabled: z.boolean().describe("Whether GitHub pull request create/update operations are enabled."),
+    github_merge_enabled: z.boolean().describe("Whether owner-approved GitHub pull request merge operations are enabled."),
+    git_sync_enabled: z.boolean().describe("Whether fast-forward synchronization of a local base branch is enabled."),
     cleanup_enabled: z.boolean().describe("Whether local cleanup operations are enabled."),
     max_paths_per_operation: z.number().int().positive().describe("Maximum explicit paths accepted by one local operation.")
-  }).describe("Effective local operation policy toggles for this repository."),
+  }).describe("Effective local and remote operation policy toggles for this repository."),
   effective_policy: z.object({
     write_enabled: z.boolean().describe("Whether file writes are enabled for this repository."),
     write_allowed_globs: z.array(z.string()).describe("Effective allowed globs for file writes."),
