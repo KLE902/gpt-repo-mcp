@@ -2,6 +2,11 @@ export const DEFAULT_OPERATIONS_POLICY = {
   enabled: false,
   git_stage_enabled: false,
   git_commit_enabled: false,
+  git_branch_enabled: false,
+  git_push_enabled: false,
+  github_pull_request_enabled: false,
+  github_merge_enabled: false,
+  git_sync_enabled: false,
   max_paths_per_operation: 50,
   cleanup_enabled: false,
   cleanup_allowed_globs: [

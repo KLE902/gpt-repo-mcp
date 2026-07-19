@@ -8,7 +8,7 @@ import { promisify } from "node:util";
 import { describe, expect, test } from "vitest";
 import { SERVER_INSTRUCTIONS, createMcpServer } from "../src/register.js";
 import { RootRegistry } from "../src/services/root-registry.js";
-import { readOnlyAnnotations, writeAnnotations } from "../src/tools/annotations.js";
+import { readOnlyAnnotations, remoteReadAnnotations, remoteWriteAnnotations, writeAnnotations } from "../src/tools/annotations.js";
 import { toolCatalog } from "../src/tools/catalog.js";
 import { isMutatingToolName } from "../src/tools/mutating-tools.js";
 
@@ -24,7 +24,11 @@ describe("MCP contract", () => {
       expect(SERVER_INSTRUCTIONS).not.toContain("read-only repository app");
       expect(SERVER_INSTRUCTIONS).toContain("Mutating tools are disabled by default and require repo-local config opt-in");
       expect(SERVER_INSTRUCTIONS).toContain("Prefer the repo_write_* names for ChatGPT workflows");
-      expect(SERVER_INSTRUCTIONS).toContain("repo_write_commit, repo_write_stage_commit, and repo_git_commit create local commits only");
+      expect(SERVER_INSTRUCTIONS).toContain("Local commit tools create commits only");
+      expect(SERVER_INSTRUCTIONS).toContain("repo_write_push");
+      expect(SERVER_INSTRUCTIONS).toContain("repo_write_create_branch");
+      expect(SERVER_INSTRUCTIONS).toContain("Force-push and direct push to main or master are blocked");
+      expect(SERVER_INSTRUCTIONS).toContain("owner explicitly approves merging a specific pull request");
       expect(SERVER_INSTRUCTIONS).toContain("repo_git_review is the workflow hub");
       expect(SERVER_INSTRUCTIONS).toContain("prefer composite workflow tools");
       expect(SERVER_INSTRUCTIONS).toContain("repo_write_stage_commit for reviewed happy-path local commits");
@@ -33,7 +37,7 @@ describe("MCP contract", () => {
       expect(SERVER_INSTRUCTIONS).toContain("Omit optional reason by default");
       expect(SERVER_INSTRUCTIONS).toContain("repo_last_write");
       expect(SERVER_INSTRUCTIONS).not.toContain("dry-run first when possible");
-      expect(SERVER_INSTRUCTIONS).toContain("do not push");
+      expect(SERVER_INSTRUCTIONS).toContain("remote work is exposed through separate fixed-purpose tools");
       expect(SERVER_INSTRUCTIONS).toContain("do not run shell commands");
     } finally {
       await close();
@@ -51,7 +55,11 @@ describe("MCP contract", () => {
         expect(tool.description).toEqual(expect.stringMatching(/^Use this when/));
         expect(tool.inputSchema).toBeDefined();
         expect(tool.outputSchema).toBeDefined();
-        if (isMutatingToolName(tool.name)) {
+        if (tool.name === "repo_remote_status") {
+          expect(tool.annotations).toMatchObject(remoteReadAnnotations);
+        } else if (["repo_write_push", "repo_write_pull_request", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name)) {
+          expect(tool.annotations).toMatchObject(remoteWriteAnnotations);
+        } else if (isMutatingToolName(tool.name)) {
           expect(tool.annotations).toMatchObject(writeAnnotations);
         } else {
           expect(tool.annotations).toMatchObject(readOnlyAnnotations);
@@ -62,12 +70,38 @@ describe("MCP contract", () => {
     }
   });
 
+  test("tools/list exposes the exact delivery workflow surface", async () => {
+    const { client, close } = await connectFixtureServer();
+    try {
+      const listed = await client.listTools();
+      const remote = listed.tools
+        .filter((tool) => ["repo_write_create_branch", "repo_remote_status", "repo_write_push", "repo_write_pull_request", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name))
+        .map((tool) => ({
+          name: tool.name,
+          annotations: tool.annotations,
+          inputKeys: Object.keys(tool.inputSchema.properties ?? {}).sort(),
+          outputKeys: Object.keys(tool.outputSchema?.properties ?? {}).sort()
+        }));
+
+      expect(remote).toEqual([
+        { name: "repo_write_create_branch", annotations: writeAnnotations, inputKeys: ["branch", "dry_run", "expected_head_sha", "expected_source_branch", "reason", "repo_id"], outputKeys: ["branch", "created", "dry_run", "head_sha", "ok", "source_branch", "warnings", "worktree_clean"] },
+        { name: "repo_remote_status", annotations: remoteReadAnnotations, inputKeys: ["pull_number", "remote", "repo_id"], outputKeys: ["ahead", "behind", "branch", "checks", "clean", "head_sha", "ok", "pull_request", "pushed", "remote", "remote_head_sha", "repository", "upstream", "warnings"] },
+        { name: "repo_write_push", annotations: remoteWriteAnnotations, inputKeys: ["dry_run", "expected_branch", "expected_head_sha", "reason", "remote", "repo_id", "set_upstream"], outputKeys: ["branch", "dry_run", "head_sha", "ok", "pushed", "remote", "remote_head_sha", "repository", "upstream", "warnings"] },
+        { name: "repo_write_pull_request", annotations: remoteWriteAnnotations, inputKeys: ["base", "body", "draft", "dry_run", "expected_branch", "expected_head_sha", "reason", "remote", "repo_id", "title"], outputKeys: ["action", "base", "branch", "dry_run", "head_sha", "ok", "pull_request", "remote", "warnings"] },
+        { name: "repo_write_sync_base", annotations: remoteWriteAnnotations, inputKeys: ["base", "dry_run", "expected_head_sha", "reason", "remote", "repo_id"], outputKeys: ["base", "current_branch", "dry_run", "head_sha", "local_base_sha_after", "local_base_sha_before", "ok", "remote", "remote_base_sha", "updated", "warnings"] },
+        { name: "repo_write_merge_pull_request", annotations: remoteWriteAnnotations, inputKeys: ["dry_run", "expected_head_sha", "expected_pull_head_sha", "merge_method", "owner_approved", "pull_number", "reason", "remote", "repo_id", "require_checks_passed", "sync_local_base"], outputKeys: ["checks", "dry_run", "merge_method", "merge_sha", "merged", "message", "ok", "pull_request", "sync", "warnings"] }
+      ]);
+    } finally {
+      await close();
+    }
+  });
+
   test("tools/list exposed surface stays stable", async () => {
     const { client, close } = await connectFixtureServer();
     try {
       const listed = await client.listTools();
 
-      expect(listed.tools.map((tool) => ({
+      expect(listed.tools.filter((tool) => tool.name !== "repo_remote_status" && !["repo_write_create_branch", "repo_write_push", "repo_write_pull_request", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name)).map((tool) => ({
         name: tool.name,
         title: tool.title,
         description: tool.description,
@@ -98,7 +132,7 @@ describe("MCP contract", () => {
               "openWorldHint": false,
               "readOnlyHint": true,
             },
-            "description": "Use this when a read, write, or cleanup policy question is blocked or the user asks what ChatGPT can access in a repo. Explains effective read/write/cleanup policy, local git operation toggles, matched globs, block reasons, and next steps without reading or mutating files.",
+            "description": "Use this when a read, write, or cleanup policy question is blocked or the user asks what ChatGPT can access in a repo. Explains effective read/write/cleanup policy, local and remote operation toggles, matched globs, block reasons, and next steps without reading or mutating files.",
             "inputKeys": [
               "operation",
               "path",
@@ -1219,9 +1253,9 @@ describe("MCP contract", () => {
   });
 
   test("representative calls for every tool match their output schema", async () => {
-    const { client, close, head } = await connectFixtureServer();
+    const { client, close, head, branch } = await connectFixtureServer();
     try {
-      for (const [name, args] of Object.entries(representativeCalls(head))) {
+      for (const [name, args] of Object.entries(representativeCalls(head, branch))) {
         const result = await client.callTool({ name, arguments: args });
         expect(result.isError, name).toBeUndefined();
         expect(result.structuredContent, name).toBeDefined();
@@ -1240,7 +1274,7 @@ describe("MCP contract", () => {
   });
 });
 
-function representativeCalls(head: string): Record<string, Record<string, unknown>> {
+function representativeCalls(head: string, branch: string): Record<string, Record<string, unknown>> {
   return {
   repo_list_roots: {},
   repo_last_write: { repo_id: "fixture" },
@@ -1251,6 +1285,7 @@ function representativeCalls(head: string): Record<string, Record<string, unknow
   repo_git_status: { repo_id: "fixture" },
   repo_git_diff: { repo_id: "fixture" },
   repo_git_review: { repo_id: "fixture" },
+  repo_write_create_branch: { repo_id: "fixture", branch: "feature/fixture-contract", expected_source_branch: branch, expected_head_sha: head, dry_run: true },
   repo_git_stage: { repo_id: "fixture", paths: ["docs/write-dry-run.md"], expected_head_sha: head, dry_run: true },
   repo_git_unstage: { repo_id: "fixture", paths: ["docs/staged.md"], expected_head_sha: head, dry_run: true },
   repo_git_restore_paths: { repo_id: "fixture", paths: ["docs/write-dry-run.md"], expected_head_sha: head, dry_run: true },
@@ -1317,6 +1352,7 @@ function representativeCalls(head: string): Record<string, Record<string, unknow
 async function connectFixtureServer() {
   const root = await createRepoRoot();
   const head = (await execFileAsync("git", ["rev-parse", "HEAD"], { cwd: root, env: { PATH: process.env.PATH ?? "" } })).stdout.trim();
+  const branch = (await execFileAsync("git", ["symbolic-ref", "--quiet", "--short", "HEAD"], { cwd: root, env: { PATH: process.env.PATH ?? "" } })).stdout.trim();
   const registry = await RootRegistry.fromConfig({
     repos: [{
       repo_id: "fixture",
@@ -1327,6 +1363,7 @@ async function connectFixtureServer() {
         enabled: true,
         git_stage_enabled: true,
         git_commit_enabled: true,
+        git_branch_enabled: true,
         cleanup_enabled: true
       }
     }],
@@ -1344,6 +1381,7 @@ async function connectFixtureServer() {
   return {
     client,
     head,
+    branch,
     close: async () => {
       await client.close();
       await server.close();

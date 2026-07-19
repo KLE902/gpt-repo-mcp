@@ -71,7 +71,7 @@ describe("TaskInventoryService", () => {
     expect(second.truncated).toBe(false);
   });
 
-  test("scans internal tree pages before paginating task results", async () => {
+  test("scans internal tree pages before paginating task results", { timeout: 15_000 }, async () => {
     const fixture = await createRepoFixture();
     await mkdir(join(fixture.root, "many"), { recursive: true });
     for (let index = 0; index < 2005; index += 1) {

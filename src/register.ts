@@ -3,6 +3,9 @@ import { SERVER_INSTRUCTIONS } from "./instructions.js";
 import { toolCatalog } from "./tools/catalog.js";
 import { registerCatalogTool } from "./tools/define-tool.js";
 import type { RuntimeContext } from "./runtime/context.js";
+import { normalizeRuntimeEnvironment } from "./runtime/environment.js";
+
+normalizeRuntimeEnvironment();
 
 export { SERVER_INSTRUCTIONS };
 

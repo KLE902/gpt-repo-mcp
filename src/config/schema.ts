@@ -15,6 +15,11 @@ export const OperationsPolicyConfigSchema = z.object({
   enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.enabled),
   git_stage_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.git_stage_enabled),
   git_commit_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.git_commit_enabled),
+  git_branch_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.git_branch_enabled),
+  git_push_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.git_push_enabled),
+  github_pull_request_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.github_pull_request_enabled),
+  github_merge_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.github_merge_enabled),
+  git_sync_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.git_sync_enabled),
   max_paths_per_operation: PositiveIntSchema.default(DEFAULT_OPERATIONS_POLICY.max_paths_per_operation),
   cleanup_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.cleanup_enabled),
   cleanup_allowed_globs: z.array(z.string()).default(DEFAULT_OPERATIONS_POLICY.cleanup_allowed_globs)

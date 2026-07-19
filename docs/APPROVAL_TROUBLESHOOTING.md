@@ -16,6 +16,11 @@ Use this checklist when a mutating tool dry-run succeeds but the actual tool cal
   - `repo_write_stage_commit`
   - `repo_write_recover`
   - `repo_cleanup_paths`
+  - `repo_write_create_branch`
+  - `repo_write_push`
+  - `repo_write_pull_request`
+  - `repo_write_sync_base`
+  - `repo_write_merge_pull_request`
   - compatibility aliases:
   - `repo_git_stage`
   - `repo_git_unstage`
@@ -60,7 +65,7 @@ Prefer `repo_write_stage`, `repo_write_unstage`, and `repo_write_commit` in Chat
 git commit -m "<message>"
 ```
 
-This indicates client-side pre-approval blocking, not necessarily a server policy failure. The server still requires repo-local operations opt-in, exact `expected_head_sha`, and exact `expected_staged_paths`, and it creates a local commit only. It does not push, pull, reset, checkout, switch, rebase, merge, stash, clean, force, delete branches, or run shell commands.
+This indicates client-side pre-approval blocking, not necessarily a server policy failure. Local commit tools still require repo-local operations opt-in, exact `expected_head_sha`, and exact `expected_staged_paths`, and they create a local commit only. Delivery uses separate tools and opt-ins. The only branch-changing tool creates a brand-new branch with fixed `git switch -c` after exact source-branch/HEAD validation; no tool switches to an existing branch, resets, rebases, stashes, runs `git clean`, force-pushes, deletes branches, or runs shell commands.
 
 ## Write-Prefixed Alias Result
 

@@ -26,13 +26,21 @@ npm run add -- /path/to/repo --mode ship
 
 - `read` keeps writes and operations disabled.
 - `write` enables broad repo-local writes guarded by hard denied paths, secret checks, path sandboxing, resulting-content secret scans, and size limits.
-- `ship` uses write mode and also enables local git stage, commit, recover, and cleanup operations.
+- `ship` uses write mode and also enables bounded creation of a new feature branch, local Git stage/commit/recovery, and the GitHub `origin` workflow.
 
-`write` and `ship` use the same write policy. For clone-based solo-dev setup, that policy allows repo-local paths broadly with `allowed_globs: ["**"]` while the hard deny list still blocks `.env*`, private keys, Git internals, root and nested dependency directories, common generated/cache directories, coverage, test results, and virtual environments. The difference is that `ship` also enables the local operation policy for stage, commit, recover, and cleanup.
+`write` and `ship` use the same file-write policy. For clone-based solo-dev setup, that policy allows repo-local paths broadly with `allowed_globs: ["**"]` while the hard deny list still blocks `.env*`, private keys, Git internals, dependency directories, generated/cache directories, coverage, test results, and virtual environments. `ship` additionally enables bounded new-branch creation, local stage/commit/recovery, and the separately gated GitHub `origin` workflow.
 
-No mode adds shell execution or push, pull, reset, checkout, switch, rebase, merge, stash, clean, force, or branch deletion tools.
+No mode adds shell execution or arbitrary Git commands. Force-push, direct base-branch push, reset, switching to an existing branch, rebase, stash, `git clean`, and branch deletion remain unavailable. The sole branch-changing operation is fixed creation of a new branch from an exact source branch and HEAD.
 
-Manual config remains supported. The following is a full policy-shape example for documentation; replace `/absolute/path/to/repo` with a real local repository path before using it:
+## Remote GitHub Delivery
+
+When work is still on a base branch, the supported sequence is `repo_write_create_branch` → `repo_git_review` → local commit → `repo_write_push` → `repo_write_pull_request` → `repo_remote_status` → explicit owner approval → `repo_write_merge_pull_request` → `repo_write_sync_base` when needed. If work already starts on a suitable feature branch, skip only the create-branch step.
+
+Delivery operations are independent opt-ins: `git_branch_enabled`, `git_push_enabled`, `github_pull_request_enabled`, `github_merge_enabled`, and `git_sync_enabled`. Branch creation is local-only and can create, but never reopen, a feature branch. Remote operations accept only the `origin` remote and GitHub.com repository URLs. Push requires a clean named feature branch, exact branch and HEAD guards, and a non-force refspec; `main` and `master` are rejected. PR merge requires `owner_approved: true`, the exact reviewed PR head SHA, and successful known checks by default. Base synchronization is fast-forward only and never changes the checked-out branch.
+
+GitHub API access first uses `GPT_REPO_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN` in the MCP server environment. If none is present, the standard startup scripts reuse the authenticated GitHub CLI session through `gh auth token` without printing or persisting the value. For a fine-grained token, PR create/update needs Pull requests write, merge needs Contents write, and status inspection needs read access to pull requests, checks, and commit statuses. Git transport authentication is separate and comes from the host Git credential manager or SSH agent.
+
+Manual config remains supported. The following is a file-write policy example for documentation; replace `/absolute/path/to/repo` with a real local repository path before using it:
 
 ```json
 {
@@ -115,7 +123,7 @@ Exact root public docs (`README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURIT
 
 The `npm run add -- <path> --mode write` and `--mode ship` shortcuts intentionally use a broader deny-first solo-dev write policy than the schema default. Hard denied globs and secret/content checks still win. The `gpt-repo` binary is available when the package is linked or installed; clone-based setup should use the npm scripts.
 
-Use `repo_policy_explain` when a read, write, or cleanup policy question is blocked unexpectedly. It reports the effective read/write/cleanup policy, matched globs, stable block code, local git operation toggles, and next safe step without reading or mutating files. For stage, commit, or recovery path blockers, use `repo_git_review` plus the specific local operation tool result.
+Use `repo_policy_explain` when a read, write, cleanup, or repository-operation policy question is blocked unexpectedly. It reports the effective policies, matched globs, stable block code, local and remote operation toggles, and next safe step without reading or mutating files. For stage, commit, or recovery path blockers, use `repo_git_review` plus the specific local operation tool result.
 
 ## Actions
 
@@ -401,10 +409,10 @@ The smoke test should only touch files under `.chatgpt/tool-tests/` and should n
 
 ## Non-Goals
 
-The write tools do not provide:
+The generic file writers do not provide:
 
 - shell execution
-- git add, commit, push, reset, or checkout
+- arbitrary Git commands, reset, checkout, or force operations
 - direct Codex execution
 - arbitrary writes outside the configured write policy
 - writes to absolute paths, traversal paths, symlink escapes, secret candidates, denied globs, device files, sockets, named pipes, binary edit targets, or secret-looking resulting content

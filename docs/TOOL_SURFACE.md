@@ -13,14 +13,20 @@ flows. Use `repo_write_stage`, `repo_write_unstage`, `repo_git_restore_paths`,
 `repo_git_stage`, `repo_git_unstage`, and `repo_git_commit` remain available as
 compatibility aliases with the same contracts and safety checks.
 
+For reviewed delivery that begins on a base branch, first use `repo_write_create_branch` to create and switch to a brand-new feature branch from the exact current source branch and HEAD. Continue with `repo_write_push`,
+`repo_write_pull_request`, `repo_remote_status`, and—only after explicit owner
+approval—`repo_write_merge_pull_request`. Use `repo_write_sync_base` for a
+separate fast-forward local base update. The branch tool is local-only. The remote tools are open-world because
+they access `origin` and GitHub, but they remain fixed-purpose and policy-gated.
+
 ## Approval Behavior
 
-ChatGPT clients should show tool payloads and request confirmation before
-calling mutating tools. For mutating workflows, inspect status, diff, or file
-context first; then request explicit user approval for the actual mutation.
+ChatGPT clients may show tool payloads and require confirmation before calling mutating tools. That client confirmation is not a new product or project decision. When the user has already requested implementation, delivery, or recovery, the agent should inspect status, diff, or file context and continue through reversible in-scope writes, bounded creation of a new feature branch when needed, local commit, feature-branch push, PR create/update, and fast-forward synchronization without asking a separate conversational question. Pull-request merge remains a separate explicit owner decision.
+
+
 `dry_run` is a preview option for user-requested previews, unclear risk,
 new-tool testing, or unusual state. For review-provided actual composite
-payloads after explicit approval, call the actual composite tool directly.
+payloads inside an authorized workflow, call the actual composite tool directly.
 `repo_git_review` generated next-tool payloads intentionally omit optional
 `reason` fields to keep host/client approval payloads small and stable. ChatGPT
 or the user may add a short `reason` manually when it adds meaningful audit
@@ -73,7 +79,7 @@ Example:
 Explains effective repository policy without reading or mutating files. Use it when a read, write, or cleanup policy question is blocked unexpectedly, or when the user asks what ChatGPT can access.
 
 Input: `repo_id`, optional `path`, optional `operation` (`read`, `write`, or `cleanup`).
-Output: `summary`, per-area `read`, `write`, and `cleanup` decisions, local git operation toggles, effective policy globs, and `guidance[]`.
+Output: `summary`, per-area `read`, `write`, and `cleanup` decisions, local and remote operation toggles, effective policy globs, and `guidance[]`.
 Example:
 
 ```json
@@ -202,6 +208,46 @@ Example:
   "reason": "Preview staging explicit reviewed files"
 }
 ```
+
+### `repo_write_create_branch`
+
+Creates and switches to one new local feature branch from the exact current source branch and HEAD. It requires `operations.git_branch_enabled`, validates the target with `git check-ref-format --branch`, rejects `main`, `master`, the current branch, and every existing local branch, and uses only fixed `git switch -c <new-branch>`. It does not contact a remote, open an existing branch, reset, stash, rebase, clean, delete a branch, or run a shell.
+
+The worktree does not have to be clean. Reviewed staged and unstaged changes can therefore move off a base branch without being committed there. A dirty starting state returns `WORKTREE_CHANGES_CARRIED_TO_NEW_BRANCH`. Actual execution verifies that the new branch is active and that HEAD did not change.
+
+Input: `repo_id`, `branch`, `expected_source_branch`, `expected_head_sha`, optional `dry_run`, and `reason`.
+Output: `ok`, `dry_run`, `source_branch`, `branch`, `head_sha`, `created`, `worktree_clean`, and `warnings`.
+Example:
+
+```json
+{
+  "repo_id": "example-repo",
+  "branch": "feature/remote-delivery",
+  "expected_source_branch": "main",
+  "expected_head_sha": "0123456789abcdef0123456789abcdef01234567",
+  "dry_run": true
+}
+```
+
+### `repo_remote_status`
+
+Reads the configured `origin`, current branch/HEAD/clean state, upstream divergence, matching GitHub pull request, and normalized checks. It is read-only but has `openWorldHint: true` because it accesses GitHub and the Git remote.
+
+### `repo_write_push`
+
+Pushes the exact reviewed clean feature branch and HEAD to `origin` with a fixed non-force refspec. It rejects detached HEAD, stale HEAD, branch mismatch, dirty state, non-GitHub remotes, remotes other than `origin`, and direct push to `main` or `master`.
+
+### `repo_write_pull_request`
+
+Creates or updates the open GitHub pull request for the exact pushed branch. It requires the remote branch SHA to match local HEAD. Title, optional body, base, and draft-on-create are typed inputs; an existing draft state is not silently changed.
+
+### `repo_write_sync_base`
+
+Synchronizes a local base branch with `origin` without switching branches. If the base is checked out it uses `pull --ff-only`; otherwise it fetches an explicit base refspec. No rebase, reset, or force update is available.
+
+### `repo_write_merge_pull_request`
+
+Merges a specific GitHub PR only when `owner_approved` is literally true and the current PR head matches `expected_pull_head_sha`. Known checks must pass by default. The response reports GitHub merge success separately from the optional best-effort local base sync.
 
 ### `repo_git_stage`
 
@@ -647,9 +693,11 @@ Plan a change:
 
 Ship/current changes:
 
-1. `repo_git_review` with `{ "repo_id": "..." }` for current status, diff summary, risks, and next dry-run or actual payloads.
-2. `repo_git_diff` with only `{ "repo_id": "..." }` only when raw diff hunks need direct inspection.
-3. `repo_next_action` with ship-oriented prompting when choosing readiness or next cleanup.
+1. Run `repo_git_status` or `repo_git_review` to establish the current branch, HEAD, and changed paths.
+2. If the work is on `main`/`master`, call `repo_write_create_branch` with the exact source branch and HEAD before committing. Skip this only when already on the intended feature branch.
+3. Review and commit the exact changed paths; use granular stage plus commit when some paths were already staged.
+4. Push with `repo_write_push`, create/update the PR with `repo_write_pull_request`, and inspect it with `repo_remote_status`.
+5. Stop for explicit owner approval before `repo_write_merge_pull_request`; synchronize the local base with `repo_write_sync_base` when needed.
 
 Stage and commit reviewed changes:
 

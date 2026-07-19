@@ -2,7 +2,7 @@ export const descriptions = {
   repo_list_roots:
     "Use this when the user asks which approved repositories are available. Does not read file contents.",
   repo_policy_explain:
-    "Use this when a read, write, or cleanup policy question is blocked or the user asks what ChatGPT can access in a repo. Explains effective read/write/cleanup policy, local git operation toggles, matched globs, block reasons, and next steps without reading or mutating files.",
+    "Use this when a read, write, or cleanup policy question is blocked or the user asks what ChatGPT can access in a repo. Explains effective read/write/cleanup policy, local and remote operation toggles, matched globs, block reasons, and next steps without reading or mutating files.",
   repo_last_write:
     "Use this when the user asks what the last write operation changed or how to continue review/recovery after a previous write. Reads safe local receipt metadata only and never mutates files or git.",
   repo_tree:
@@ -19,6 +19,18 @@ export const descriptions = {
     "Use this when the user asks to review changes or inspect a git diff. Default first call should pass only repo_id. Do not include staged, unstaged, paths, max_bytes, or context_lines on the first pass. Use optional filters only after the default diff is truncated, too broad, or the user asks for a specific comparison.",
   repo_git_review:
     "Use this when the user asks to review current git changes, recover bad write-tool edits, clean up generated artifacts, prepare staging, or plan a local commit without mutating anything. Workflow hub that returns status, diff summary, warnings, and ready-to-run composite payloads for repo_write_stage_commit and repo_write_recover plus low-level fallback payloads.",
+  repo_write_create_branch:
+    "Use this when an authorized delivery workflow needs to create and switch to a new local feature branch from the exact current source branch and HEAD. It may carry reviewed staged or unstaged changes, never switches to an existing branch, and never runs arbitrary Git commands.",
+  repo_remote_status:
+    "Use this when the user asks whether a branch is pushed, whether a pull request exists, or whether GitHub checks have passed. Reads the configured GitHub remote and API without mutating local or remote state.",
+  repo_write_push:
+    "Use this when a reviewed local commit is ready for the routine next step in an authorized delivery workflow. No separate conversational approval is required for pushing the exact current feature branch and HEAD. Requires remote opt-in, a clean worktree, exact branch and HEAD guards, uses fixed git arguments, never force-pushes, and refuses direct push to main or master.",
+  repo_write_pull_request:
+    "Use this when the exact current branch has been pushed and its GitHub pull request should be created or updated as the routine next step in an authorized delivery workflow. No separate conversational approval is required. Requires remote opt-in, exact branch and HEAD guards, a GitHub remote, and runtime GitHub authentication for mutations.",
+  repo_write_sync_base:
+    "Use this when the user asks to update the local main/master base from its configured GitHub remote without switching branches. Uses only fast-forward pull when the base is checked out or a fixed fetch refspec otherwise; never rebases or force-updates.",
+  repo_write_merge_pull_request:
+    "Use this when the owner has explicitly approved merging a specific GitHub pull request. Requires owner_approved true, exact local and PR head SHAs, remote merge opt-in, successful checks by default, and optionally fast-forwards the local base after GitHub confirms the merge.",
   repo_git_stage:
     "Use this when compatibility with the git-prefixed staging alias is needed; prefer repo_write_stage for ChatGPT workflows. Stages explicit repo-relative paths only, requires user approval and expected HEAD, and never runs shell commands.",
   repo_git_unstage:

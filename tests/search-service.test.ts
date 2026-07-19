@@ -25,7 +25,7 @@ describe("SearchService", () => {
     const fixture = await createRepoFixture();
     const service = new SearchService(fixture.root, new PathSandbox(fixture.root));
 
-    expect((await service.search({ query: "super-secret" })).returned_count).toBe(0);
+    expect((await service.search({ query: "fixture-sensitive-value" })).returned_count).toBe(0);
     expect((await service.search({ query: "ignored" })).returned_count).toBe(0);
     expect((await service.search({ query: "nested" })).returned_count).toBe(0);
   });

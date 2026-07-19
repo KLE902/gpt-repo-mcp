@@ -1,6 +1,7 @@
 import type { ToolName } from "./contracts.js";
 
 export const MUTATING_TOOL_NAMES = [
+  "repo_write_create_branch",
   "repo_write_file",
   "repo_write_changes",
   "repo_write_handoff",
@@ -14,7 +15,11 @@ export const MUTATING_TOOL_NAMES = [
   "repo_write_commit",
   "repo_write_stage_commit",
   "repo_write_recover",
-  "repo_cleanup_paths"
+  "repo_cleanup_paths",
+  "repo_write_push",
+  "repo_write_pull_request",
+  "repo_write_sync_base",
+  "repo_write_merge_pull_request"
 ] as const satisfies readonly ToolName[];
 
 const MUTATING_TOOL_NAME_SET = new Set<ToolName>(MUTATING_TOOL_NAMES);

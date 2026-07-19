@@ -13,12 +13,12 @@ npm run connect
 This starts the local MCP server and starts or reuses ngrok as the built-in convenience HTTPS tunnel. Copy the exact printed URL:
 
 ```text
-ChatGPT MCP URL: https://<ngrok-host>/t/<random-token>/mcp
+ChatGPT MCP URL: https://<ngrok-host>/t/<stable-local-token>/mcp
 ```
 
-ChatGPT cannot call `localhost` directly. The built-in convenience path uses a public HTTPS `/t/<random-token>/mcp` endpoint.
+ChatGPT cannot call `localhost` directly. The built-in convenience path uses a public HTTPS `/t/<stable-local-token>/mcp` endpoint.
 
-The random path token is guess-resistance only, not authentication. Anyone with the full URL can reach the endpoint while the public tunnel is running. Treat public tunnel URLs as temporary local development endpoints and stop them between sessions.
+The first run creates a random path value under the current user's profile and later runs reuse it. The value stays outside Git, is separate from GitHub credentials, and provides guess-resistance rather than authentication. Anyone with the full URL can reach the endpoint while the public tunnel is running. The complete URL remains stable only while the public ngrok host also remains unchanged.
 
 Advanced secure tunnel:
 
@@ -37,7 +37,7 @@ In ChatGPT:
 3. Open Advanced settings.
 4. Enable Developer Mode.
 5. Create a new app or connector.
-6. For `npm run connect`, set Connector URL to the exact public `/t/<random-token>/mcp` endpoint printed by the command. For Secure MCP Tunnel, choose Tunnel as the connection type and select or paste the `tunnel_...` id.
+6. For `npm run connect`, set Connector URL to the exact public `/t/<stable-local-token>/mcp` endpoint printed by the command. For Secure MCP Tunnel, choose Tunnel as the connection type and select or paste the `tunnel_...` id.
 7. Create the connector.
 8. Verify the tool list appears.
 
@@ -58,7 +58,7 @@ npm run connect
 Paste the exact printed URL into the **Server URL** field:
 
 ```text
-https://<ngrok-host>/t/<random-token>/mcp
+https://<ngrok-host>/t/<stable-local-token>/mcp
 ```
 
 ![ChatGPT Server URL setup](assets/chatgpt-server-url.png)
@@ -101,17 +101,18 @@ When mutating tools are enabled, ChatGPT requires confirmation for write, git, o
 
 ## Connection Options
 
-- Built-in convenience tunnel: run `npm run connect` and paste the printed `/t/<random-token>/mcp` URL.
-- Manual tunnel provider: start the local server with an explicit token, expose port `8787` through your HTTPS tunnel or reverse proxy, and use `/t/<that-token>/mcp`.
+- Built-in convenience tunnel: run `npm run connect` and paste the printed `/t/<stable-local-token>/mcp` URL.
+- Manual tunnel provider: start the local server with an explicit path value, expose port `8787` through your HTTPS tunnel or reverse proxy, and use `/t/<that-value>/mcp`.
 - Advanced secure tunnel: run `npm run connect:secure` and choose Tunnel as the connector connection type.
 
-See [CONNECTION_OPTIONS.md](CONNECTION_OPTIONS.md) for provider setup, token details, and troubleshooting.
+See [CONNECTION_OPTIONS.md](CONNECTION_OPTIONS.md) for provider setup, path-value details, and troubleshooting.
 
 ## Troubleshooting
 
 - The connector cannot connect through Secure MCP Tunnel: confirm `npm run connect:secure` is still running and the connector uses Tunnel.
 - The connector cannot connect through a public tunnel: confirm the local server and tunnel are still running.
-- The URL is rejected: confirm it starts with `https://` and, for public tunnel paths, exactly matches the current `/t/<token>/mcp` URL.
+- The URL is rejected: confirm it starts with `https://` and, for public tunnel paths, exactly matches the printed `/t/<token>/mcp` URL.
+- The URL changed after restart: the local path value persists; update the connector only if the public tunnel host changed or the local file was removed.
 - Tools look stale: refresh connector metadata after code or description changes.
 - No repositories are listed: run `npm run list`.
 - Config looks wrong: run `npm run check:config` or `npm run doctor`.

@@ -34,7 +34,7 @@ This project is a closed-world MCP server for approved local repositories. Quali
 
 - Do not add shell execution or generic command execution.
 - Do not weaken approved-root, path traversal, symlink, secret, denied glob, expected SHA, expected HEAD, or exact staged path checks.
-- Do not expose push, pull, reset, checkout, switch, rebase, merge, stash, clean, force, branch deletion, or arbitrary git command tools.
+- Do not expose arbitrary Git commands, force-push, direct base-branch push, reset, switching to existing branches, rebase, stash, `git clean`, or branch deletion. The bounded `repo_write_create_branch` exception may only run fixed `git switch -c <new-branch>` after exact source-branch/HEAD validation and existing-branch rejection. Remote delivery must remain fixed-purpose, `origin`-only, GitHub-specific, and separately gated.
 - Prefer repo-relative paths in outputs and logs.
 - Keep generated backups and cleanup artifacts out of commits unless explicitly reviewed.
 

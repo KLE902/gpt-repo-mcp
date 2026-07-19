@@ -231,7 +231,7 @@ describe("connect-gpt config CLI", () => {
     expect(repo?.operations?.enabled).toBe(false);
   });
 
-  test("add --ship enables write policy and local git operations", async () => {
+  test("add --ship enables write policy plus bounded local and remote git operations", async () => {
     const sandbox = await mkdtemp(join(tmpdir(), "connect-gpt-cli-"));
     const configPath = join(sandbox, "config.local.json");
     const repoRoot = join(sandbox, "repo");
@@ -248,6 +248,11 @@ describe("connect-gpt config CLI", () => {
           enabled?: boolean;
           git_stage_enabled?: boolean;
           git_commit_enabled?: boolean;
+          git_branch_enabled?: boolean;
+          git_push_enabled?: boolean;
+          github_pull_request_enabled?: boolean;
+          github_merge_enabled?: boolean;
+          git_sync_enabled?: boolean;
           cleanup_enabled?: boolean;
         };
       }>;
@@ -258,6 +263,11 @@ describe("connect-gpt config CLI", () => {
       enabled: true,
       git_stage_enabled: true,
       git_commit_enabled: true,
+      git_branch_enabled: true,
+      git_push_enabled: true,
+      github_pull_request_enabled: true,
+      github_merge_enabled: true,
+      git_sync_enabled: true,
       cleanup_enabled: true
     });
   });

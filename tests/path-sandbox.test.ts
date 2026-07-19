@@ -27,12 +27,12 @@ describe("PathSandbox", () => {
   test("rejects symlink escapes", async () => {
     const root = await mkdtemp(join(tmpdir(), "repo-reader-"));
     const outside = await mkdtemp(join(tmpdir(), "repo-reader-outside-"));
-    await writeFile(join(outside, "secret.txt"), "secret");
-    await symlink(join(outside, "secret.txt"), join(root, "linked-secret.txt"));
+    await writeFile(join(outside, "secret.txt"), "fixture data");
+    await symlink(outside, join(root, "linked-outside"), process.platform === "win32" ? "junction" : "dir");
 
     const sandbox = new PathSandbox(root);
 
-    await expect(sandbox.resolve("linked-secret.txt")).rejects.toMatchObject({
+    await expect(sandbox.resolve("linked-outside/secret.txt")).rejects.toMatchObject({
       code: "SYMLINK_ESCAPE_REJECTED"
     });
   });

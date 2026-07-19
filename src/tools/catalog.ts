@@ -1,5 +1,5 @@
 import { descriptions } from "./descriptions.js";
-import { readOnlyAnnotations, writeAnnotations } from "./annotations.js";
+import { readOnlyAnnotations, remoteReadAnnotations, remoteWriteAnnotations, writeAnnotations } from "./annotations.js";
 import { toolContracts, type ToolContract, type ToolName } from "./contracts.js";
 import {
   changePlanHandler,
@@ -10,6 +10,8 @@ import {
   gitCommitHandler,
   gitDiffHandler,
   gitReviewHandler,
+  writeCreateBranchHandler,
+  remoteStatusHandler,
   gitRestorePathsHandler,
   gitStageHandler,
   gitStatusHandler,
@@ -32,6 +34,10 @@ import {
   writeFileHandler,
   writeHandoffHandler,
   policyExplainHandler,
+  writePushHandler,
+  writePullRequestHandler,
+  writeSyncBaseHandler,
+  writeMergePullRequestHandler,
   writeStageHandler,
   writeUnstageHandler,
   type ToolHandler
@@ -43,7 +49,7 @@ export type ToolDefinition = {
   description: string;
   inputSchema: ToolContract["input"];
   outputSchema: ToolContract["output"];
-  annotations: typeof readOnlyAnnotations | typeof writeAnnotations;
+  annotations: typeof readOnlyAnnotations | typeof remoteReadAnnotations | typeof writeAnnotations | typeof remoteWriteAnnotations;
   handler: ToolHandler;
 };
 
@@ -137,6 +143,60 @@ export const toolCatalog: ToolDefinition[] = [
     outputSchema: toolContracts.repo_git_review.output,
     annotations: readOnlyAnnotations,
     handler: gitReviewHandler
+  },
+  {
+    name: "repo_write_create_branch",
+    title: "Create feature branch",
+    description: descriptions.repo_write_create_branch,
+    inputSchema: toolContracts.repo_write_create_branch.input,
+    outputSchema: toolContracts.repo_write_create_branch.output,
+    annotations: writeAnnotations,
+    handler: writeCreateBranchHandler
+  },
+  {
+    name: "repo_remote_status",
+    title: "Inspect GitHub remote status",
+    description: descriptions.repo_remote_status,
+    inputSchema: toolContracts.repo_remote_status.input,
+    outputSchema: toolContracts.repo_remote_status.output,
+    annotations: remoteReadAnnotations,
+    handler: remoteStatusHandler
+  },
+  {
+    name: "repo_write_push",
+    title: "Push reviewed branch",
+    description: descriptions.repo_write_push,
+    inputSchema: toolContracts.repo_write_push.input,
+    outputSchema: toolContracts.repo_write_push.output,
+    annotations: remoteWriteAnnotations,
+    handler: writePushHandler
+  },
+  {
+    name: "repo_write_pull_request",
+    title: "Create or update pull request",
+    description: descriptions.repo_write_pull_request,
+    inputSchema: toolContracts.repo_write_pull_request.input,
+    outputSchema: toolContracts.repo_write_pull_request.output,
+    annotations: remoteWriteAnnotations,
+    handler: writePullRequestHandler
+  },
+  {
+    name: "repo_write_sync_base",
+    title: "Fast-forward local base",
+    description: descriptions.repo_write_sync_base,
+    inputSchema: toolContracts.repo_write_sync_base.input,
+    outputSchema: toolContracts.repo_write_sync_base.output,
+    annotations: remoteWriteAnnotations,
+    handler: writeSyncBaseHandler
+  },
+  {
+    name: "repo_write_merge_pull_request",
+    title: "Merge owner-approved pull request",
+    description: descriptions.repo_write_merge_pull_request,
+    inputSchema: toolContracts.repo_write_merge_pull_request.input,
+    outputSchema: toolContracts.repo_write_merge_pull_request.output,
+    annotations: remoteWriteAnnotations,
+    handler: writeMergePullRequestHandler
   },
   {
     name: "repo_git_stage",
