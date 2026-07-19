@@ -22,8 +22,8 @@ describe("package startup scripts", () => {
     );
     expect(pkg.scripts?.mcp).toBe("GPT_REPO_CONFIG=./config.local.json PORT=8787 npm run dev");
     expect(pkg.scripts?.tunnel).toContain("--log=stdout");
-    expect(pkg.scripts?.connect).toBe("node scripts/connect-dev.mjs");
-    expect(pkg.scripts?.["connect:secure"]).toBe("node scripts/connect-secure.mjs");
+    expect(pkg.scripts?.connect).toBe("node scripts/preload-github-runtime-access.mjs dev");
+    expect(pkg.scripts?.["connect:secure"]).toBe("node scripts/preload-github-runtime-access.mjs secure");
     expect(pkg.scripts?.add).toBe("node dist/cli/connect-gpt.js add");
     expect(pkg.scripts?.remove).toBe("node dist/cli/connect-gpt.js remove");
     expect(pkg.scripts?.list).toBe("node dist/cli/connect-gpt.js list");

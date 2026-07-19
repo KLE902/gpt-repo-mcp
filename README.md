@@ -107,7 +107,7 @@ No mode enables arbitrary shell or Git execution, force-push, direct push to `ma
 6. Merge only after explicit owner approval with `repo_write_merge_pull_request`; the exact reviewed PR head SHA is mandatory and checks must pass by default.
 7. Fast-forward the local base with `repo_write_sync_base`, or let the merge tool attempt it after GitHub confirms success.
 
-All remote tools are restricted to the configured `origin` on GitHub.com. Push never uses force and refuses `main` or `master`. GitHub API mutations use `GPT_REPO_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN` from the MCP server environment; Git push authentication uses the machine's configured credential manager or SSH agent.
+All remote tools are restricted to the configured `origin` on GitHub.com. Push never uses force and refuses `main` or `master`. GitHub API mutations use `GPT_REPO_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN` from the MCP server environment; when none is set, the standard startup scripts reuse the authenticated GitHub CLI session through `gh auth token` without printing or persisting it. Git push authentication uses the machine's configured credential manager or SSH agent.
 
 ## Example ChatGPT Prompts
 
