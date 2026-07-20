@@ -52,3 +52,46 @@ jobs:
 
       - name: Whitespace check
         run: git diff --check
+
+  windows-desktop-launcher:
+    name: Windows desktop launcher
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install desktop launcher through npm
+        shell: powershell
+        run: npm run install:desktop-launcher -- -Force
+
+      - name: Verify generated launcher
+        shell: powershell
+        run: |
+          $desktop = [Environment]::GetFolderPath([Environment+SpecialFolder]::DesktopDirectory)
+          $launcherPath = Join-Path $desktop "Start GPT Repo MCP.cmd"
+          if (-not (Test-Path -LiteralPath $launcherPath -PathType Leaf)) {
+            throw "Desktop launcher was not created: $launcherPath"
+          }
+
+          $repoPath = (Resolve-Path ".").Path
+          $launcher = [System.IO.File]::ReadAllText($launcherPath)
+          $expectedCd = "cd /d `"$repoPath`""
+          if (-not $launcher.Contains($expectedCd)) {
+            throw "Desktop launcher does not target the checked-out repository."
+          }
+          if (-not $launcher.Contains("call npm.cmd run connect")) {
+            throw "Desktop launcher does not start the connector through npm.cmd."
+          }
+          if (-not $launcher.Contains("pause")) {
+            throw "Desktop launcher does not keep the window open for diagnostics."
+          }
