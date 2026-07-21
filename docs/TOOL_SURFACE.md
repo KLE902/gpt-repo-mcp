@@ -257,6 +257,22 @@ Dispatches a locally allowlisted GitHub Actions `workflow_dispatch` workflow on 
 
 Runs a locally configured script id. The caller cannot provide executable or arguments. Exact HEAD, timeout, output cap, restricted environment, output redaction, exit code, and completeness are enforced.
 
+The included `scripts/github-pr-ready.mjs` wrapper can be configured as `github.pr-ready`. It requires a clean named feature branch, derives the GitHub repository from `origin`, verifies that the open PR branch and head SHA exactly match local HEAD, runs the authenticated GitHub CLI command `gh pr ready`, re-reads the PR, and fails closed on any mismatch. Repeated execution is idempotent when the PR is already ready. A typical repository-local configuration is:
+
+```json
+{
+  "github.pr-ready": {
+    "command": "npm.cmd",
+    "args": ["run", "github:pr-ready"],
+    "timeout_ms": 120000,
+    "max_output_bytes": 131072,
+    "inherit_env": []
+  }
+}
+```
+
+For another approved repository, configure `node` with an absolute local path to this fixed wrapper while keeping the target repository as the script working directory. No PR number, branch, repository, executable, or argument is supplied by the model.
+
 ### `repo_write_sync_base`
 
 Synchronizes a local base branch with `origin` without switching branches. If the base is checked out it uses `pull --ff-only`; otherwise it fetches an explicit base refspec. No rebase, reset, or force update is available.
@@ -713,7 +729,8 @@ Ship/current changes:
 2. If the work is on `main`/`master`, call `repo_write_create_branch` with the exact source branch and HEAD before committing. Skip this only when already on the intended feature branch.
 3. Review and commit the exact changed paths; use granular stage plus commit when some paths were already staged.
 4. Push with `repo_write_push`, create/update the PR with `repo_write_pull_request`, and inspect it with `repo_remote_status`.
-5. Stop for explicit owner approval before `repo_write_merge_pull_request`; synchronize the local base with `repo_write_sync_base` when needed.
+5. When `github.pr-ready` is configured, run it through `repo_run_allowed_script` with the exact current HEAD, then inspect the PR and checks again with `repo_remote_status`. This removes the manual Ready for review click without adding a duplicate GitHub mutation tool.
+6. Stop for explicit owner approval before `repo_write_merge_pull_request`; synchronize the local base with `repo_write_sync_base` when needed.
 
 Stage and commit reviewed changes:
 
