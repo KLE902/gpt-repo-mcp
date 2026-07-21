@@ -57,7 +57,7 @@ describe("AllowedScriptService", () => {
     }, async () => HEAD);
 
     const output = await service.run({ repo_id: "fixture", script_id: "checks", expected_head_sha: HEAD, dry_run: false });
-    expect(captured.command).toBe("npm.cmd");
+    expect(captured.command).toBe("node.exe");
     expect(captured.args).toEqual(["run", "test"]);
     expect(captured.env).toMatchObject({ PATH: "fixture-path", SAFE_FLAG: "allowed" });
     expect(captured.env).not.toHaveProperty("UNLISTED_FLAG");
@@ -65,7 +65,7 @@ describe("AllowedScriptService", () => {
   });
 
   test("resolves npm.cmd through the active npm CLI on Windows without a shell", () => {
-    const script = policy().config.allowed_scripts.checks;
+    const script = npmPolicy().config.allowed_scripts.checks;
     const resolved = resolveAllowedScriptInvocation(
       script,
       { npm_execpath: "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js" },
@@ -81,7 +81,7 @@ describe("AllowedScriptService", () => {
   });
 
   test("fails closed when Windows npm.cmd has no active npm runtime", () => {
-    const script = policy().config.allowed_scripts.checks;
+    const script = npmPolicy().config.allowed_scripts.checks;
     let thrown: unknown;
     try {
       resolveAllowedScriptInvocation(script, {}, "win32", "node.exe");
@@ -140,7 +140,7 @@ describe("AllowedScriptService", () => {
       script_run_enabled: true,
       allowed_scripts: {
         checks: {
-          command: "npm.cmd",
+          command: "node.exe",
           args: ["run", "test"],
           timeout_ms: 30_000,
           max_output_bytes: 9,
@@ -183,11 +183,27 @@ function policy(): OperationsPolicy {
     script_run_enabled: true,
     allowed_scripts: {
       checks: {
-        command: "npm.cmd",
+        command: "node.exe",
         args: ["run", "test"],
         timeout_ms: 30_000,
         max_output_bytes: 16_384,
         inherit_env: ["SAFE_FLAG"]
+      }
+    }
+  });
+}
+
+function npmPolicy(): OperationsPolicy {
+  return new OperationsPolicy({
+    enabled: true,
+    script_run_enabled: true,
+    allowed_scripts: {
+      checks: {
+        command: "npm.cmd",
+        args: ["run", "test"],
+        timeout_ms: 30_000,
+        max_output_bytes: 16_384,
+        inherit_env: []
       }
     }
   });

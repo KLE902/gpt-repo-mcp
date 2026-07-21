@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { URL, pathToFileURL } from "node:url";
 
 const SHA_PATTERN = /^[a-f0-9]{40}$/i;
 const PR_FIELDS = "number,state,isDraft,headRefName,headRefOid,baseRefName,url,statusCheckRollup";
