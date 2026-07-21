@@ -38,7 +38,6 @@ import {
   policyExplainHandler,
   writePushHandler,
   writePullRequestHandler,
-  writePullRequestStateHandler,
   writeFinalizePullRequestHandler,
   writeDispatchWorkflowHandler,
   runAllowedScriptHandler,
@@ -203,15 +202,6 @@ export const toolCatalog: ToolDefinition[] = [
     outputSchema: toolContracts.repo_write_pull_request.output,
     annotations: remoteWriteAnnotations,
     handler: writePullRequestHandler
-  },
-  {
-    name: "repo_write_pull_request_state",
-    title: "Update pull request state",
-    description: descriptions.repo_write_pull_request_state,
-    inputSchema: toolContracts.repo_write_pull_request_state.input,
-    outputSchema: toolContracts.repo_write_pull_request_state.output,
-    annotations: remoteWriteAnnotations,
-    handler: writePullRequestStateHandler
   },
   {
     name: "repo_write_finalize_pull_request",

@@ -13,7 +13,7 @@ flows. Use `repo_write_stage`, `repo_write_unstage`, `repo_git_restore_paths`,
 `repo_git_stage`, `repo_git_unstage`, and `repo_git_commit` remain available as
 compatibility aliases with the same contracts and safety checks.
 
-For reviewed delivery that begins on a base branch, use `repo_write_create_branch`, review and commit, then `repo_write_push`, `repo_write_pull_request`, optional `repo_write_pull_request_state`, and `repo_remote_status`. Merge only after explicit owner approval with `repo_write_merge_pull_request`, then use `repo_write_finalize_pull_request` for verified base synchronization, switch, and branch cleanup. `repo_git_branches` and `repo_write_switch_branch` support guarded local branch handling. `repo_run_allowed_script` accepts only configured script ids; `repo_write_dispatch_workflow` starts only locally allowlisted GitHub Actions workflows after exact remote ref-SHA validation.
+For reviewed delivery that begins on a base branch, use `repo_write_create_branch`, review and commit, then `repo_write_push`, `repo_write_pull_request`, and `repo_remote_status`. Use the installed GitHub integration or GitHub CLI for draft-ready and close operations. Merge only after explicit owner approval with `repo_write_merge_pull_request`, then use `repo_write_finalize_pull_request` for verified base synchronization, switch, and branch cleanup. `repo_git_branches` and `repo_write_switch_branch` support guarded local branch handling. `repo_run_allowed_script` accepts only configured script ids; `repo_write_dispatch_workflow` starts only locally allowlisted GitHub Actions workflows after exact remote ref-SHA validation.
 
 ## Approval Behavior
 
@@ -244,10 +244,6 @@ Pushes the exact reviewed clean feature branch and HEAD to `origin` with a fixed
 ### `repo_write_pull_request`
 
 Creates or updates the open GitHub pull request for the exact pushed branch. It requires the remote branch SHA to match local HEAD. Title, optional body, base, and draft-on-create are typed inputs; an existing draft state is not silently changed.
-
-### `repo_write_pull_request_state`
-
-Marks an exact open draft ready for review or closes an exact unmerged pull request. The reviewed pull-request head SHA is mandatory.
 
 ### `repo_write_finalize_pull_request`
 

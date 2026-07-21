@@ -19,7 +19,6 @@ export const MUTATING_TOOL_NAMES = [
   "repo_cleanup_paths",
   "repo_write_push",
   "repo_write_pull_request",
-  "repo_write_pull_request_state",
   "repo_write_finalize_pull_request",
   "repo_write_dispatch_workflow",
   "repo_run_allowed_script",

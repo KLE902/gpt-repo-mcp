@@ -388,26 +388,6 @@ describe("RemoteGitService", () => {
     expect(calls.filter((args) => args[0] === "switch")).toEqual([["switch", "main"]]);
   });
 
-  test("closes only the exact unmerged pull request head", async () => {
-    const requests: Array<{ method: string; url: string }> = [];
-    const service = new RemoteGitService("/repo", new OperationsPolicy({ enabled: true, github_pull_request_state_enabled: true }), {
-      git_runner: async (args) => args.join(" ") === "remote get-url origin" ? "https://github.com/acme/demo.git" : "",
-      env: { GPT_REPO_GITHUB_TOKEN: "fixture-access" },
-      fetch_impl: async (input, init) => {
-        const url = String(input);
-        const method = init?.method ?? "GET";
-        requests.push({ method, url });
-        if (method === "GET") return jsonResponse(pullFixture());
-        if (method === "PATCH") return jsonResponse(pullFixture({ state: "closed" }));
-        throw new Error(`Unexpected request: ${method} ${url}`);
-      }
-    });
-
-    const output = await service.pullRequestState({ repo_id: "fixture", remote: "origin", pull_number: 7, expected_pull_head_sha: HEAD, action: "close", dry_run: false });
-    expect(output).toMatchObject({ action: "close", changed: true, pull_request: { state: "closed", head_sha: HEAD } });
-    expect(requests.map((request) => request.method)).toEqual(["GET", "PATCH"]);
-  });
-
   test("dispatches only the named GitHub workflow and bounded inputs", async () => {
     const requests: Array<{ method: string; url: string; body?: string }> = [];
     const service = new RemoteGitService("/repo", new OperationsPolicy({ enabled: true, github_workflow_dispatch_enabled: true, allowed_workflows: ["validation.yml"] }), {

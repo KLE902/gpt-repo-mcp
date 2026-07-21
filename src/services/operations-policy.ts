@@ -17,7 +17,6 @@ export type OperationsPolicyConfig = {
   git_branch_manage_enabled?: boolean;
   git_push_enabled?: boolean;
   github_pull_request_enabled?: boolean;
-  github_pull_request_state_enabled?: boolean;
   github_workflow_dispatch_enabled?: boolean;
   allowed_workflows?: string[];
   github_merge_enabled?: boolean;
@@ -37,7 +36,6 @@ export type EffectiveOperationsPolicy = {
   git_branch_manage_enabled: boolean;
   git_push_enabled: boolean;
   github_pull_request_enabled: boolean;
-  github_pull_request_state_enabled: boolean;
   github_workflow_dispatch_enabled: boolean;
   allowed_workflows: string[];
   github_merge_enabled: boolean;
@@ -61,7 +59,6 @@ export class OperationsPolicy {
       git_branch_manage_enabled: config.git_branch_manage_enabled ?? DEFAULT_OPERATIONS_POLICY.git_branch_manage_enabled,
       git_push_enabled: config.git_push_enabled ?? DEFAULT_OPERATIONS_POLICY.git_push_enabled,
       github_pull_request_enabled: config.github_pull_request_enabled ?? DEFAULT_OPERATIONS_POLICY.github_pull_request_enabled,
-      github_pull_request_state_enabled: config.github_pull_request_state_enabled ?? DEFAULT_OPERATIONS_POLICY.github_pull_request_state_enabled,
       github_workflow_dispatch_enabled: config.github_workflow_dispatch_enabled ?? DEFAULT_OPERATIONS_POLICY.github_workflow_dispatch_enabled,
       allowed_workflows: [...(config.allowed_workflows ?? DEFAULT_OPERATIONS_POLICY.allowed_workflows)],
       github_merge_enabled: config.github_merge_enabled ?? DEFAULT_OPERATIONS_POLICY.github_merge_enabled,
@@ -104,11 +101,6 @@ export class OperationsPolicy {
   assertPullRequestAllowed(): void {
     this.assertEnabled();
     if (!this.config.github_pull_request_enabled) throw new RepoReaderError("GITHUB_PULL_REQUEST_DISABLED", "GitHub pull request operations are disabled for this repository.");
-  }
-
-  assertPullRequestStateAllowed(): void {
-    this.assertEnabled();
-    if (!this.config.github_pull_request_state_enabled) throw new RepoReaderError("GITHUB_PULL_REQUEST_STATE_DISABLED", "GitHub pull request state operations are disabled for this repository.");
   }
 
   assertWorkflowAllowed(workflowId: string): void {

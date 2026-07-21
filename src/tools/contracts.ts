@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import { AllowedScriptInputSchema, AllowedScriptResultSchema, BranchListInputSchema, BranchListResultSchema, FinalizePullRequestInputSchema, FinalizePullRequestResultSchema, PullRequestStateInputSchema, PullRequestStateResultSchema, SwitchBranchInputSchema, SwitchBranchResultSchema, WorkflowDispatchInputSchema, WorkflowDispatchResultSchema } from "../contracts/autonomous-operations.contract.js";
+import { AllowedScriptInputSchema, AllowedScriptResultSchema, BranchListInputSchema, BranchListResultSchema, FinalizePullRequestInputSchema, FinalizePullRequestResultSchema, SwitchBranchInputSchema, SwitchBranchResultSchema, WorkflowDispatchInputSchema, WorkflowDispatchResultSchema } from "../contracts/autonomous-operations.contract.js";
 import { ChangePlanInputSchema, ChangePlanResultSchema } from "../contracts/change-plan.contract.js";
 import { CleanupPathsInputSchema, CleanupPathsResultSchema } from "../contracts/cleanup.contract.js";
 import { CodexReviewInputSchema, CodexReviewResultSchema, CodexTaskInputSchema, CodexTaskResultSchema, CodexTaskWriteInputSchema, CodexTaskWriteResultSchema } from "../contracts/codex-task.contract.js";
@@ -38,7 +38,6 @@ export type ToolName =
   | "repo_remote_status"
   | "repo_write_push"
   | "repo_write_pull_request"
-  | "repo_write_pull_request_state"
   | "repo_write_finalize_pull_request"
   | "repo_write_dispatch_workflow"
   | "repo_run_allowed_script"
@@ -136,10 +135,6 @@ export const toolContracts = {
   repo_write_pull_request: {
     input: PullRequestInputSchema,
     output: PullRequestResultSchema
-  },
-  repo_write_pull_request_state: {
-    input: PullRequestStateInputSchema,
-    output: PullRequestStateResultSchema
   },
   repo_write_finalize_pull_request: {
     input: FinalizePullRequestInputSchema,

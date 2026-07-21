@@ -82,7 +82,7 @@ export class GitHubClient {
     }));
   }
 
-  async updatePull(owner: string, repo: string, pullNumber: number, input: { title?: string; body?: string; base?: string; state?: "closed" }): Promise<GitHubPull> {
+  async updatePull(owner: string, repo: string, pullNumber: number, input: { title?: string; body?: string; base?: string }): Promise<GitHubPull> {
     return PullSchema.parse(await this.request<unknown>(`/repos/${segment(owner)}/${segment(repo)}/pulls/${pullNumber}`, {
       method: "PATCH",
       body: input,
@@ -107,66 +107,12 @@ export class GitHubClient {
     }));
   }
 
-  async markPullReady(owner: string, repo: string, pullNumber: number): Promise<GitHubPull> {
-    const lookup = await this.graphql<{
-      repository: { pullRequest: { id: string; isDraft: boolean } | null } | null;
-    }>(
-      "query PullRequestNode($owner: String!, $repo: String!, $number: Int!) { repository(owner: $owner, name: $repo) { pullRequest(number: $number) { id isDraft } } }",
-      { owner, repo, number: pullNumber }
-    );
-    const node = lookup.repository?.pullRequest;
-    if (!node) throw new RepoReaderError("GITHUB_API_ERROR", "GitHub did not return the requested pull request node.");
-    if (node.isDraft) {
-      await this.graphql(
-        "mutation MarkReady($pullRequestId: ID!) { markPullRequestReadyForReview(input: { pullRequestId: $pullRequestId }) { pullRequest { number } } }",
-        { pullRequestId: node.id }
-      );
-    }
-    return this.getPull(owner, repo, pullNumber);
-  }
-
-  async closePull(owner: string, repo: string, pullNumber: number): Promise<GitHubPull> {
-    return this.updatePull(owner, repo, pullNumber, { state: "closed" });
-  }
-
   async dispatchWorkflow(owner: string, repo: string, workflowId: string, ref: string, inputs: Record<string, string>): Promise<void> {
     await this.request(`/repos/${segment(owner)}/${segment(repo)}/actions/workflows/${segment(workflowId)}/dispatches`, {
       method: "POST",
       body: { ref, inputs },
       require_auth: true
     });
-  }
-
-  private async graphql<T = unknown>(query: string, variables: Record<string, unknown>): Promise<T> {
-    if (!this.accessValue) {
-      throw new RepoReaderError("GITHUB_AUTH_REQUIRED", "GitHub GraphQL mutation requires runtime GitHub access.");
-    }
-    const headers: Record<string, string> = {
-      Accept: "application/vnd.github+json",
-      "Content-Type": "application/json",
-      "User-Agent": "gpt-repo-mcp"
-    };
-    headers[["Author", "ization"].join("")] = ["Bear", "er ", this.accessValue].join("");
-    let response: Response;
-    try {
-      response = await this.fetchImpl("https://api.github.com/graphql", {
-        method: "POST",
-        headers,
-        signal: AbortSignal.timeout(30_000),
-        body: JSON.stringify({ query, variables })
-      });
-    } catch {
-      throw new RepoReaderError("GITHUB_API_ERROR", "GitHub GraphQL request failed before a response was received.", { retryable: true });
-    }
-    const value = await response.json().catch(() => undefined) as { data?: T; errors?: Array<{ message?: unknown }> } | undefined;
-    const firstError = value?.errors?.find((item) => typeof item.message === "string")?.message;
-    if (!response.ok || !value?.data || firstError) {
-      throw new RepoReaderError("GITHUB_API_ERROR", `GitHub GraphQL request failed${typeof firstError === "string" ? `: ${firstError.replace(/[\r\n\t]/g, " ").slice(0, 240)}` : "."}`, {
-        retryable: response.status === 429 || response.status >= 500,
-        diagnostics: { status: response.status }
-      });
-    }
-    return value.data;
   }
 
   private async request<T>(path: string, options: { method?: "GET" | "POST" | "PATCH" | "PUT"; body?: unknown; require_auth?: boolean } = {}): Promise<T> {

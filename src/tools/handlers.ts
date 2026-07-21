@@ -47,7 +47,7 @@ import type { GitReviewInput } from "../contracts/git-review.contract.js";
 import type { CleanupPathsInput } from "../contracts/cleanup.contract.js";
 import type { HandoffInput } from "../contracts/handoff.contract.js";
 import type { CreateBranchInput, MergePullRequestInput, PullRequestInput, PushInput, RemoteStatusInput, SyncBaseInput } from "../contracts/remote-git.contract.js";
-import type { AllowedScriptInput, BranchListInput, FinalizePullRequestInput, PullRequestStateInput, SwitchBranchInput, WorkflowDispatchInput } from "../contracts/autonomous-operations.contract.js";
+import type { AllowedScriptInput, BranchListInput, FinalizePullRequestInput, SwitchBranchInput, WorkflowDispatchInput } from "../contracts/autonomous-operations.contract.js";
 
 type RepoInput = { repo_id: string };
 type ReadManyInput = RepoInput & {
@@ -187,13 +187,6 @@ export const writePullRequestHandler: ToolHandler = async (input, context) => sa
   const result = await new RemoteGitService(repo.root, new OperationsPolicy(repo.operations)).pullRequest(args);
   audit({ tool: "repo_write_pull_request", repo_id: args.repo_id, warnings: result.warnings });
   return createSuccessEnvelope(result, result.pull_request ? `${result.action} pull request #${result.pull_request.number}.` : `${result.action} pull request for ${result.branch}.`, { warnings: result.warnings });
-});
-
-export const writePullRequestStateHandler: ToolHandler = async (input, context) => safeTool<PullRequestStateInput>("repo_write_pull_request_state", input, context, async (args) => {
-  const repo = context.registry.get(args.repo_id);
-  const result = await new RemoteGitService(repo.root, new OperationsPolicy(repo.operations)).pullRequestState(args);
-  audit({ tool: "repo_write_pull_request_state", repo_id: args.repo_id, warnings: result.warnings });
-  return createSuccessEnvelope(result, result.dry_run ? `Dry run validated ${result.action} for pull request #${result.pull_request.number}.` : `${result.action} applied to pull request #${result.pull_request.number}.`, { warnings: result.warnings });
 });
 
 export const writeFinalizePullRequestHandler: ToolHandler = async (input, context) => safeTool<FinalizePullRequestInput>("repo_write_finalize_pull_request", input, context, async (args) => {

@@ -45,23 +45,6 @@ export const SwitchBranchResultSchema = z.object({
   warnings: z.array(z.string()).describe("Stable warning codes from branch switching.")
 });
 
-export const PullRequestStateInputSchema = RepoInputSchema.extend({
-  remote: RemoteNameSchema.optional().default("origin").describe("Configured GitHub remote, restricted to origin."),
-  pull_number: PullNumberSchema.describe("Exact pull request whose state may change."),
-  expected_pull_head_sha: ShaSchema.describe("Exact reviewed pull-request head SHA required before state mutation."),
-  action: z.enum(["ready", "close"]).describe("Mark an open draft ready for review, or close an unmerged pull request."),
-  dry_run: z.boolean().optional().default(false).describe("Validate pull-request state and guards without mutating GitHub."),
-  reason: z.string().max(500).optional().describe("Optional concise audit reason for the pull-request state change.")
-});
-export const PullRequestStateResultSchema = z.object({
-  ok: z.literal(true).describe("Whether pull-request state validation or mutation succeeded."),
-  dry_run: z.boolean().describe("Whether the operation was validation-only."),
-  action: z.enum(["ready", "close"]).describe("State action validated or applied."),
-  changed: z.boolean().describe("Whether GitHub pull-request state actually changed."),
-  pull_request: PullRequestSchema.describe("Current pull-request metadata after validation or mutation."),
-  warnings: z.array(z.string()).describe("Stable warning codes from pull-request state handling.")
-});
-
 export const FinalizePullRequestInputSchema = RepoInputSchema.extend({
   remote: RemoteNameSchema.optional().default("origin").describe("Configured GitHub remote, restricted to origin."),
   pull_number: PullNumberSchema.describe("Confirmed merged pull request to finalize locally and remotely."),
@@ -127,7 +110,6 @@ export const WorkflowDispatchResultSchema = z.object({
 
 export type BranchListInput = z.infer<typeof BranchListInputSchema>;
 export type SwitchBranchInput = z.infer<typeof SwitchBranchInputSchema>;
-export type PullRequestStateInput = z.infer<typeof PullRequestStateInputSchema>;
 export type FinalizePullRequestInput = z.infer<typeof FinalizePullRequestInputSchema>;
 export type AllowedScriptInput = z.infer<typeof AllowedScriptInputSchema>;
 export type WorkflowDispatchInput = z.infer<typeof WorkflowDispatchInputSchema>;

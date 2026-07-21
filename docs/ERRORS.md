@@ -54,7 +54,6 @@ All tool errors return:
 | `GIT_BRANCH_MANAGE_DISABLED` | Existing-branch switch or verified post-merge cleanup was requested without `operations.git_branch_manage_enabled`. |
 | `GIT_PUSH_DISABLED` | Push was requested without `operations.git_push_enabled`. |
 | `GITHUB_PULL_REQUEST_DISABLED` | Pull-request creation or update was requested without its operation toggle. |
-| `GITHUB_PULL_REQUEST_STATE_DISABLED` | Pull-request ready/close was requested without its operation toggle. |
 | `GITHUB_WORKFLOW_DISPATCH_DISABLED` | GitHub Actions dispatch was requested without its operation toggle. |
 | `GITHUB_WORKFLOW_NOT_ALLOWED` | The requested workflow id is not locally allowlisted for this repository. |
 | `GITHUB_MERGE_DISABLED` | Pull-request merge was requested without its operation toggle. |
@@ -79,7 +78,6 @@ All tool errors return:
 | `GITHUB_API_ERROR` | A GitHub API request failed and was returned as a sanitized error. |
 | `GITHUB_PR_HEAD_MISMATCH` | The pull-request head changed after owner review. Review the new head before merging. |
 | `GITHUB_PR_NOT_OPEN` | The requested pull request is not open for this merge workflow. |
-| `GITHUB_PR_STATE_INVALID` | The requested ready/close transition is invalid for the current pull-request state. |
 | `GITHUB_PR_NOT_MERGED` | Post-merge finalization was requested for a pull request GitHub has not confirmed as merged. |
 | `GITHUB_PR_NOT_MERGEABLE` | GitHub reports that the pull request cannot currently be merged. |
 | `GITHUB_CHECKS_NOT_PASSED` | Required known checks were not successful, so merge was not attempted. |

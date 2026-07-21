@@ -65,7 +65,7 @@ Prefer `repo_write_stage`, `repo_write_unstage`, and `repo_write_commit` in Chat
 git commit -m "<message>"
 ```
 
-This indicates client-side pre-approval blocking, not necessarily a server policy failure. Local commit tools still require repo-local operations opt-in, exact `expected_head_sha`, and exact `expected_staged_paths`, and they create a local commit only. Delivery uses separate tools and opt-ins. The only branch-changing tool creates a brand-new branch with fixed `git switch -c` after exact source-branch/HEAD validation; no tool switches to an existing branch, resets, rebases, stashes, runs `git clean`, force-pushes, deletes branches, or runs shell commands.
+This indicates client-side pre-approval blocking, not necessarily a server policy failure. Local commit tools still require repo-local operations opt-in, exact `expected_head_sha`, and exact `expected_staged_paths`, and they create a local commit only. Delivery uses separate tools and opt-ins. Branch creation, clean existing-branch switching, and verified post-merge cleanup are fixed-purpose operations with exact state guards; no tool resets, rebases, stashes, runs `git clean`, force-pushes, or accepts arbitrary shell commands.
 
 ## Write-Prefixed Alias Result
 

@@ -252,7 +252,6 @@ describe("connect-gpt config CLI", () => {
           git_branch_manage_enabled?: boolean;
           git_push_enabled?: boolean;
           github_pull_request_enabled?: boolean;
-          github_pull_request_state_enabled?: boolean;
           github_workflow_dispatch_enabled?: boolean;
           allowed_workflows?: string[];
           github_merge_enabled?: boolean;
@@ -273,7 +272,6 @@ describe("connect-gpt config CLI", () => {
       git_branch_manage_enabled: true,
       git_push_enabled: true,
       github_pull_request_enabled: true,
-      github_pull_request_state_enabled: true,
       github_workflow_dispatch_enabled: true,
       allowed_workflows: [],
       github_merge_enabled: true,

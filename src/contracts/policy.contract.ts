@@ -31,7 +31,6 @@ export const PolicyExplainResultSchema = z.object({
     git_branch_manage_enabled: z.boolean().describe("Whether guarded switching to existing branches and verified post-merge branch cleanup are enabled."),
     git_push_enabled: z.boolean().describe("Whether non-force push of the exact current feature branch is enabled."),
     github_pull_request_enabled: z.boolean().describe("Whether GitHub pull request create/update operations are enabled."),
-    github_pull_request_state_enabled: z.boolean().describe("Whether draft-ready and close operations are enabled for exact pull requests."),
     github_workflow_dispatch_enabled: z.boolean().describe("Whether GitHub Actions workflow dispatch is enabled."),
     allowed_workflow_ids: z.array(z.string()).describe("Locally allowlisted workflow identifiers available for dispatch."),
     github_merge_enabled: z.boolean().describe("Whether owner-approved GitHub pull request merge operations are enabled."),

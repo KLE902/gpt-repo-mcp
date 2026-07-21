@@ -31,8 +31,6 @@ export const descriptions = {
     "Use this when a reviewed local commit is ready for the routine next step in an authorized delivery workflow. No separate conversational approval is required for pushing the exact current feature branch and HEAD. Requires remote opt-in, a clean worktree, exact branch and HEAD guards, uses fixed git arguments, never force-pushes, and refuses direct push to main or master.",
   repo_write_pull_request:
     "Use this when the exact current branch has been pushed and its GitHub pull request should be created or updated as the routine next step in an authorized delivery workflow. No separate conversational approval is required. Requires remote opt-in, exact branch and HEAD guards, a GitHub remote, and runtime GitHub authentication for mutations.",
-  repo_write_pull_request_state:
-    "Use this when an exact draft pull request should be marked ready for review or an exact unmerged pull request should be closed. Requires the reviewed PR head SHA and dedicated policy opt-in.",
   repo_write_finalize_pull_request:
     "Use this when GitHub confirms an exact pull request was merged and the owner approved cleanup. Fast-forwards the base, switches to it, and deletes only the verified local and optional origin feature branch.",
   repo_write_dispatch_workflow:

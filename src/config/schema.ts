@@ -27,7 +27,6 @@ export const OperationsPolicyConfigSchema = z.object({
   git_branch_manage_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.git_branch_manage_enabled),
   git_push_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.git_push_enabled),
   github_pull_request_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.github_pull_request_enabled),
-  github_pull_request_state_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.github_pull_request_state_enabled),
   github_workflow_dispatch_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.github_workflow_dispatch_enabled),
   allowed_workflows: z.array(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)).max(64).default(DEFAULT_OPERATIONS_POLICY.allowed_workflows),
   github_merge_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.github_merge_enabled),

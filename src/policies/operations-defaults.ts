@@ -6,7 +6,6 @@ export const DEFAULT_OPERATIONS_POLICY = {
   git_branch_manage_enabled: false,
   git_push_enabled: false,
   github_pull_request_enabled: false,
-  github_pull_request_state_enabled: false,
   github_workflow_dispatch_enabled: false,
   allowed_workflows: [],
   github_merge_enabled: false,

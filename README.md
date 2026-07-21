@@ -105,7 +105,7 @@ No mode enables arbitrary shell or Git execution, force-push, direct push to `ma
 2. Review and commit locally with `repo_git_review` and `repo_write_stage_commit`, or the granular stage/commit tools when changes are already staged.
 3. Push the exact clean feature branch and reviewed HEAD with `repo_write_push`.
 4. Create or update its GitHub pull request with `repo_write_pull_request`.
-5. Inspect PR state and checks with `repo_remote_status`; use `repo_write_pull_request_state` to mark an exact draft ready or close an exact unmerged PR.
+5. Inspect PR state and checks with `repo_remote_status`; use the installed GitHub integration or GitHub CLI for draft-ready and close operations.
 6. Merge only after explicit owner approval with `repo_write_merge_pull_request`; the exact reviewed PR head SHA is mandatory and checks must pass by default.
 7. After merge, use `repo_write_finalize_pull_request` to synchronize and switch to the base, then delete only the verified merged feature branch locally and optionally on `origin`. Use `repo_write_sync_base` when cleanup is not intended.
 
@@ -162,7 +162,7 @@ Codex is done. Review the Codex result and the git diff for <repo_id>.
 | File writes | `repo_write_file`, `repo_write_changes` |
 | ChatGPT session continuity | `repo_write_handoff`, `repo_last_write` |
 | Local ship flow | `repo_write_create_branch`, `repo_git_branches`, `repo_write_switch_branch`, `repo_write_stage`, `repo_write_unstage`, `repo_write_commit`, `repo_write_stage_commit`, `repo_write_recover`, `repo_cleanup_paths`, `repo_run_allowed_script` |
-| GitHub remote flow | `repo_remote_status`, `repo_write_push`, `repo_write_pull_request`, `repo_write_pull_request_state`, `repo_write_merge_pull_request`, `repo_write_finalize_pull_request`, `repo_write_sync_base`, `repo_write_dispatch_workflow` |
+| GitHub remote flow | `repo_remote_status`, `repo_write_push`, `repo_write_pull_request`, `repo_write_merge_pull_request`, `repo_write_finalize_pull_request`, `repo_write_sync_base`, `repo_write_dispatch_workflow` |
 | Compatibility aliases | `repo_git_stage`, `repo_git_unstage`, `repo_git_commit` |
 | Codex/Claude coordination | `repo_prepare_codex_task`, `repo_write_codex_task`, `repo_codex_review` |
 

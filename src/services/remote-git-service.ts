@@ -13,7 +13,6 @@ import type {
 import type {
   BranchListInput,
   FinalizePullRequestInput,
-  PullRequestStateInput,
   SwitchBranchInput,
   WorkflowDispatchInput
 } from "../contracts/autonomous-operations.contract.js";
@@ -250,30 +249,6 @@ export class RemoteGitService {
       ...(input.set_upstream ? { upstream: `${input.remote}/${state.branch}` } : {}),
       warnings: []
     };
-  }
-
-  async pullRequestState(input: PullRequestStateInput) {
-    this.assertOrigin(input.remote);
-    this.policy.assertPullRequestStateAllowed();
-    const repository = await this.repositoryFor(input.remote);
-    const pull = await this.github.getPull(repository.owner, repository.name, input.pull_number);
-    if (pull.head.sha !== input.expected_pull_head_sha) {
-      throw new RepoReaderError("GITHUB_PR_HEAD_MISMATCH", "Pull request head changed before its state could be updated.");
-    }
-    if (pull.merged) throw new RepoReaderError("GITHUB_PR_STATE_INVALID", "Merged pull requests cannot be changed by this state tool.");
-    if (input.action === "ready") {
-      if (pull.state !== "open") throw new RepoReaderError("GITHUB_PR_NOT_OPEN", "Only an open draft pull request can be marked ready.");
-      if (input.dry_run || !pull.draft) {
-        return { ok: true as const, dry_run: input.dry_run, action: input.action, changed: false, pull_request: mapPull(pull), warnings: pull.draft ? [] : ["PULL_REQUEST_ALREADY_READY"] };
-      }
-      const updated = await this.github.markPullReady(repository.owner, repository.name, pull.number);
-      return { ok: true as const, dry_run: false, action: input.action, changed: true, pull_request: mapPull(updated), warnings: [] as string[] };
-    }
-    if (input.dry_run || pull.state === "closed") {
-      return { ok: true as const, dry_run: input.dry_run, action: input.action, changed: false, pull_request: mapPull(pull), warnings: pull.state === "closed" ? ["PULL_REQUEST_ALREADY_CLOSED"] : [] };
-    }
-    const updated = await this.github.closePull(repository.owner, repository.name, pull.number);
-    return { ok: true as const, dry_run: false, action: input.action, changed: true, pull_request: mapPull(updated), warnings: [] as string[] };
   }
 
   async finalizePullRequest(input: FinalizePullRequestInput) {

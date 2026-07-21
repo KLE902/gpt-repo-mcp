@@ -57,7 +57,7 @@ describe("MCP contract", () => {
         expect(tool.outputSchema).toBeDefined();
         if (["repo_remote_status", "repo_git_branches"].includes(tool.name)) {
           expect(tool.annotations).toMatchObject(remoteReadAnnotations);
-        } else if (["repo_write_push", "repo_write_pull_request", "repo_write_pull_request_state", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name)) {
+        } else if (["repo_write_push", "repo_write_pull_request", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name)) {
           expect(tool.annotations).toMatchObject(remoteWriteAnnotations);
         } else if (isMutatingToolName(tool.name)) {
           expect(tool.annotations).toMatchObject(writeAnnotations);
@@ -81,7 +81,6 @@ describe("MCP contract", () => {
         "repo_remote_status",
         "repo_write_push",
         "repo_write_pull_request",
-        "repo_write_pull_request_state",
         "repo_write_finalize_pull_request",
         "repo_write_dispatch_workflow",
         "repo_run_allowed_script",
@@ -93,7 +92,7 @@ describe("MCP contract", () => {
       expect(delivery.find((tool) => tool.name === "repo_git_branches")?.annotations).toMatchObject(remoteReadAnnotations);
       expect(delivery.find((tool) => tool.name === "repo_write_switch_branch")?.annotations).toMatchObject(writeAnnotations);
       expect(delivery.find((tool) => tool.name === "repo_run_allowed_script")?.annotations).toMatchObject(writeAnnotations);
-      for (const name of ["repo_write_pull_request_state", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow"]) {
+      for (const name of ["repo_write_finalize_pull_request", "repo_write_dispatch_workflow"]) {
         expect(delivery.find((tool) => tool.name === name)?.annotations).toMatchObject(remoteWriteAnnotations);
       }
       expect(Object.keys(delivery.find((tool) => tool.name === "repo_write_finalize_pull_request")?.inputSchema.properties ?? {}).sort()).toEqual([
@@ -112,7 +111,7 @@ describe("MCP contract", () => {
     try {
       const listed = await client.listTools();
 
-      expect(listed.tools.filter((tool) => tool.name !== "repo_remote_status" && !["repo_write_create_branch", "repo_git_branches", "repo_write_switch_branch", "repo_write_push", "repo_write_pull_request", "repo_write_pull_request_state", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_run_allowed_script", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name)).map((tool) => ({
+      expect(listed.tools.filter((tool) => tool.name !== "repo_remote_status" && !["repo_write_create_branch", "repo_git_branches", "repo_write_switch_branch", "repo_write_push", "repo_write_pull_request", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_run_allowed_script", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name)).map((tool) => ({
         name: tool.name,
         title: tool.title,
         description: tool.description,
