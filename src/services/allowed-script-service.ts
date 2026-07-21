@@ -41,11 +41,37 @@ export class AllowedScriptService {
       return envelope(input.script_id, true, false, emptyResult(), 0);
     }
 
+    const invocation = resolveAllowedScriptInvocation(script, this.env);
     const started = performance.now();
-    const raw = await this.processRunner(this.root, script, environmentFor(script, this.env));
+    const raw = await this.processRunner(this.root, invocation, environmentFor(invocation, this.env));
     const durationMs = Math.max(0, Math.round(performance.now() - started));
     return envelope(input.script_id, false, true, sanitize(raw, this.scanner, script.max_output_bytes), durationMs);
   }
+}
+
+export function resolveAllowedScriptInvocation(
+  script: AllowedScriptConfig,
+  source: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform = process.platform,
+  nodeExecutable: string = process.execPath
+): AllowedScriptConfig {
+  if (platform !== "win32" || !/(^|[\\/])npm\.cmd$/i.test(script.command)) {
+    return script;
+  }
+
+  const npmExecPath = source.npm_execpath?.trim();
+  if (!npmExecPath) {
+    throw new RepoReaderError(
+      "SCRIPT_RUNTIME_UNAVAILABLE",
+      "Cannot run npm.cmd without npm_execpath. Start GPT Repo MCP through npm run connect or configure a directly executable command."
+    );
+  }
+
+  return {
+    ...script,
+    command: nodeExecutable,
+    args: [npmExecPath, ...script.args]
+  };
 }
 
 function execute(root: string, script: AllowedScriptConfig, env: NodeJS.ProcessEnv): Promise<AllowedScriptProcessResult> {

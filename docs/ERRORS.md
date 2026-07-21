@@ -60,6 +60,7 @@ All tool errors return:
 | `GIT_SYNC_DISABLED` | Local base synchronization was requested without its operation toggle. |
 | `SCRIPT_RUN_DISABLED` | Allowlisted script execution was requested without its operation toggle. |
 | `SCRIPT_NOT_ALLOWED` | The requested script id is not configured for the repository. |
+| `SCRIPT_RUNTIME_UNAVAILABLE` | A configured script depends on unavailable runtime bootstrap metadata, such as `npm_execpath` for shell-free `npm.cmd` execution on Windows. |
 | `GIT_WORKTREE_DIRTY` | A remote mutation or base synchronization that requires a clean repository found staged or unstaged changes. New-branch creation is the deliberate exception. |
 | `GIT_BRANCH_MISMATCH` | Current branch did not match the supplied exact expected branch. |
 | `GIT_BRANCH_INVALID` | A supplied branch name was invalid or was an explicitly prohibited base-branch target. |

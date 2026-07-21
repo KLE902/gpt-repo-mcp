@@ -78,7 +78,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install desktop launcher through npm
+      - name: Install desktop launcher through npm      - name: Verify allowlisted npm scripts on Windows
+        run: npm test -- tests/allowed-script-service.test.ts
+
+
         shell: powershell
         run: npm run install:desktop-launcher -- -Force
 

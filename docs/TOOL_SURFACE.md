@@ -257,6 +257,8 @@ Dispatches a locally allowlisted GitHub Actions `workflow_dispatch` workflow on 
 
 Runs a locally configured script id. The caller cannot provide executable or arguments. Exact HEAD, timeout, output cap, restricted environment, output redaction, exit code, and completeness are enforced.
 
+On Windows, `npm.cmd` configurations remain shell-free: the server resolves them through the active Node.js executable and npm CLI path established by `npm run connect`. Missing runtime metadata fails closed.
+
 The included `scripts/github-pr-ready.mjs` wrapper can be configured as `github.pr-ready`. It requires a clean named feature branch, derives the GitHub repository from `origin`, verifies that the open PR branch and head SHA exactly match local HEAD, runs the authenticated GitHub CLI command `gh pr ready`, re-reads the PR, and fails closed on any mismatch. Repeated execution is idempotent when the PR is already ready. A typical repository-local configuration is:
 
 ```json
