@@ -45,6 +45,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "check:public": "node scripts/check-public.mjs",
+    "github:pr-ready": "node scripts/github-pr-ready.mjs",
     "test": "vitest run"
   },
   "dependencies": {

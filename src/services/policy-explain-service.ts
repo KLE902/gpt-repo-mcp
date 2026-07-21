@@ -39,10 +39,15 @@ export class PolicyExplainService {
       git_stage_enabled: operationsPolicy.config.git_stage_enabled,
       git_commit_enabled: operationsPolicy.config.git_commit_enabled,
       git_branch_enabled: operationsPolicy.config.git_branch_enabled,
+      git_branch_manage_enabled: operationsPolicy.config.git_branch_manage_enabled,
       git_push_enabled: operationsPolicy.config.git_push_enabled,
       github_pull_request_enabled: operationsPolicy.config.github_pull_request_enabled,
+      github_workflow_dispatch_enabled: operationsPolicy.config.github_workflow_dispatch_enabled,
+      allowed_workflow_ids: [...operationsPolicy.config.allowed_workflows].sort(),
       github_merge_enabled: operationsPolicy.config.github_merge_enabled,
       git_sync_enabled: operationsPolicy.config.git_sync_enabled,
+      script_run_enabled: operationsPolicy.config.script_run_enabled,
+      allowed_script_ids: Object.keys(operationsPolicy.config.allowed_scripts).sort(),
       cleanup_enabled: operationsPolicy.config.cleanup_enabled,
       max_paths_per_operation: operationsPolicy.config.max_paths_per_operation
     };

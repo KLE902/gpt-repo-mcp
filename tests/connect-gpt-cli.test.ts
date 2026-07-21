@@ -249,10 +249,15 @@ describe("connect-gpt config CLI", () => {
           git_stage_enabled?: boolean;
           git_commit_enabled?: boolean;
           git_branch_enabled?: boolean;
+          git_branch_manage_enabled?: boolean;
           git_push_enabled?: boolean;
           github_pull_request_enabled?: boolean;
+          github_workflow_dispatch_enabled?: boolean;
+          allowed_workflows?: string[];
           github_merge_enabled?: boolean;
           git_sync_enabled?: boolean;
+          script_run_enabled?: boolean;
+          allowed_scripts?: Record<string, unknown>;
           cleanup_enabled?: boolean;
         };
       }>;
@@ -264,10 +269,15 @@ describe("connect-gpt config CLI", () => {
       git_stage_enabled: true,
       git_commit_enabled: true,
       git_branch_enabled: true,
+      git_branch_manage_enabled: true,
       git_push_enabled: true,
       github_pull_request_enabled: true,
+      github_workflow_dispatch_enabled: true,
+      allowed_workflows: [],
       github_merge_enabled: true,
       git_sync_enabled: true,
+      script_run_enabled: false,
+      allowed_scripts: {},
       cleanup_enabled: true
     });
   });

@@ -506,10 +506,15 @@ function createModeConfig(mode: PermissionMode) {
         git_stage_enabled: true,
         git_commit_enabled: true,
         git_branch_enabled: true,
+        git_branch_manage_enabled: true,
         git_push_enabled: true,
         github_pull_request_enabled: true,
+        github_workflow_dispatch_enabled: true,
+        allowed_workflows: [],
         github_merge_enabled: true,
         git_sync_enabled: true,
+        script_run_enabled: false,
+        allowed_scripts: {},
         cleanup_enabled: true
       }
     : { enabled: false };

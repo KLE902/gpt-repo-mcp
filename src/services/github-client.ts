@@ -107,6 +107,14 @@ export class GitHubClient {
     }));
   }
 
+  async dispatchWorkflow(owner: string, repo: string, workflowId: string, ref: string, inputs: Record<string, string>): Promise<void> {
+    await this.request(`/repos/${segment(owner)}/${segment(repo)}/actions/workflows/${segment(workflowId)}/dispatches`, {
+      method: "POST",
+      body: { ref, inputs },
+      require_auth: true
+    });
+  }
+
   private async request<T>(path: string, options: { method?: "GET" | "POST" | "PATCH" | "PUT"; body?: unknown; require_auth?: boolean } = {}): Promise<T> {
     if (options.require_auth && !this.accessValue) {
       throw new RepoReaderError("GITHUB_AUTH_REQUIRED", "GitHub API mutation requires GPT_REPO_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN in the MCP server environment.");

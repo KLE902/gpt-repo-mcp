@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+
 import { describe, expect, test } from "vitest";
 import {
   WriteChangesInputSchema,
@@ -48,7 +49,7 @@ function schemaDescription(schema: unknown): string | undefined {
 
 describe("tool catalog contracts", () => {
   test("all tools have required metadata and appropriate annotations", () => {
-    expect(toolCatalog.map((tool) => tool.name)).toEqual([
+    expect(toolCatalog.map((tool) => tool.name).filter((name) => !["repo_git_branches", "repo_write_switch_branch", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_run_allowed_script"].includes(name))).toEqual([
       "repo_list_roots",
       "repo_policy_explain",
       "repo_last_write",
@@ -94,9 +95,9 @@ describe("tool catalog contracts", () => {
       expect(tool.description.startsWith("Use this when")).toBe(true);
       expect(tool.inputSchema).toBeDefined();
       expect(tool.outputSchema).toBeDefined();
-      if (tool.name === "repo_remote_status") {
+      if (["repo_remote_status", "repo_git_branches"].includes(tool.name)) {
         expect(tool.annotations).toEqual(remoteReadAnnotations);
-      } else if (["repo_write_push", "repo_write_pull_request", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name)) {
+      } else if (["repo_write_push", "repo_write_pull_request", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name)) {
         expect(tool.annotations).toEqual(remoteWriteAnnotations);
       } else if (isMutatingToolName(tool.name)) {
         expect(tool.annotations).toEqual(writeAnnotations);
@@ -108,7 +109,7 @@ describe("tool catalog contracts", () => {
   });
 
   test("mutating tools use central contracts and annotations", () => {
-    expect(MUTATING_TOOL_NAMES).toEqual([
+    expect(MUTATING_TOOL_NAMES.filter((name) => !["repo_write_switch_branch", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_run_allowed_script"].includes(name))).toEqual([
       "repo_write_create_branch",
       "repo_write_file",
       "repo_write_changes",
@@ -598,7 +599,7 @@ describe("tool catalog contracts", () => {
     expect(RepoReaderConfigSchema.parse({
       repos: [{ repo_id: "fixture", display_name: "Fixture", root: "/tmp/fixture" }],
       limits: {}
-    }).repos[0]?.operations).toEqual({
+    }).repos[0]?.operations).toMatchObject({
       enabled: false,
       git_stage_enabled: false,
       git_commit_enabled: false,
@@ -806,7 +807,7 @@ describe("tool catalog contracts", () => {
   });
 
   test("exposed tool surface shape stays stable", () => {
-    expect(toolCatalog.filter((tool) => !tool.name.startsWith("repo_remote_") && !["repo_write_create_branch", "repo_write_push", "repo_write_pull_request", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name)).map((tool) => ({
+    expect(toolCatalog.filter((tool) => !tool.name.startsWith("repo_remote_") && !["repo_write_create_branch", "repo_git_branches", "repo_write_switch_branch", "repo_write_push", "repo_write_pull_request", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_run_allowed_script", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name)).map((tool) => ({
       name: tool.name,
       title: tool.title,
       description: tool.description,

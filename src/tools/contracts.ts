@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { AllowedScriptInputSchema, AllowedScriptResultSchema, BranchListInputSchema, BranchListResultSchema, FinalizePullRequestInputSchema, FinalizePullRequestResultSchema, SwitchBranchInputSchema, SwitchBranchResultSchema, WorkflowDispatchInputSchema, WorkflowDispatchResultSchema } from "../contracts/autonomous-operations.contract.js";
 import { ChangePlanInputSchema, ChangePlanResultSchema } from "../contracts/change-plan.contract.js";
 import { CleanupPathsInputSchema, CleanupPathsResultSchema } from "../contracts/cleanup.contract.js";
 import { CodexReviewInputSchema, CodexReviewResultSchema, CodexTaskInputSchema, CodexTaskResultSchema, CodexTaskWriteInputSchema, CodexTaskWriteResultSchema } from "../contracts/codex-task.contract.js";
@@ -32,9 +33,14 @@ export type ToolName =
   | "repo_git_diff"
   | "repo_git_review"
   | "repo_write_create_branch"
+  | "repo_git_branches"
+  | "repo_write_switch_branch"
   | "repo_remote_status"
   | "repo_write_push"
   | "repo_write_pull_request"
+  | "repo_write_finalize_pull_request"
+  | "repo_write_dispatch_workflow"
+  | "repo_run_allowed_script"
   | "repo_write_sync_base"
   | "repo_write_merge_pull_request"
   | "repo_git_stage"
@@ -110,6 +116,14 @@ export const toolContracts = {
     input: CreateBranchInputSchema,
     output: CreateBranchResultSchema
   },
+  repo_git_branches: {
+    input: BranchListInputSchema,
+    output: BranchListResultSchema
+  },
+  repo_write_switch_branch: {
+    input: SwitchBranchInputSchema,
+    output: SwitchBranchResultSchema
+  },
   repo_remote_status: {
     input: RemoteStatusInputSchema,
     output: RemoteStatusResultSchema
@@ -121,6 +135,18 @@ export const toolContracts = {
   repo_write_pull_request: {
     input: PullRequestInputSchema,
     output: PullRequestResultSchema
+  },
+  repo_write_finalize_pull_request: {
+    input: FinalizePullRequestInputSchema,
+    output: FinalizePullRequestResultSchema
+  },
+  repo_write_dispatch_workflow: {
+    input: WorkflowDispatchInputSchema,
+    output: WorkflowDispatchResultSchema
+  },
+  repo_run_allowed_script: {
+    input: AllowedScriptInputSchema,
+    output: AllowedScriptResultSchema
   },
   repo_write_sync_base: {
     input: SyncBaseInputSchema,

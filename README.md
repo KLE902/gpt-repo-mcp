@@ -93,9 +93,9 @@ Clone -> Install -> Add repo -> Choose mode -> Connect ChatGPT -> Start working
 | --- | --- | --- |
 | `read` | First install, project review, cautious exploration | Inspect repo structure, search/read files, review git status and diffs, plan work. |
 | `write` | Daily implementation help | Everything in `read`, plus repo file writes guarded by policy, path checks, secret checks, and size limits. |
-| `ship` | Reviewed GitHub delivery | Everything in `write`, plus bounded new feature-branch creation, local stage/commit/recovery, and the `origin` push, pull-request, owner-approved merge, and fast-forward base-sync tools. |
+| `ship` | Reviewed GitHub delivery | Everything in `write`, plus bounded branch creation/switching, local stage/commit/recovery, the `origin` pull-request workflow, owner-approved merge, verified post-merge cleanup, and GitHub Actions dispatch. |
 
-No mode enables arbitrary shell or Git execution, force-push, direct push to `main`/`master`, switching to an existing branch, reset, rebase, stash, branch deletion, or unrestricted remote access. `ship` adds only fixed-purpose creation of a new feature branch plus the bounded GitHub workflow described below.
+No mode enables arbitrary shell or Git execution, force-push, direct push to `main`/`master`, reset, rebase, stash, or unrestricted remote access. `ship` adds only fixed-purpose branch operations and the bounded GitHub workflow below. Locally configured allowlisted scripts are a separate opt-in: ChatGPT supplies only a script id, never command text or arguments.
 
 ## Reviewed GitHub Workflow
 
@@ -105,9 +105,9 @@ No mode enables arbitrary shell or Git execution, force-push, direct push to `ma
 2. Review and commit locally with `repo_git_review` and `repo_write_stage_commit`, or the granular stage/commit tools when changes are already staged.
 3. Push the exact clean feature branch and reviewed HEAD with `repo_write_push`.
 4. Create or update its GitHub pull request with `repo_write_pull_request`.
-5. Inspect PR state and checks with `repo_remote_status`.
+5. Inspect PR state and checks with `repo_remote_status`; use the installed GitHub integration or GitHub CLI for draft-ready and close operations.
 6. Merge only after explicit owner approval with `repo_write_merge_pull_request`; the exact reviewed PR head SHA is mandatory and checks must pass by default.
-7. Fast-forward the local base with `repo_write_sync_base`, or let the merge tool attempt it after GitHub confirms success.
+7. After merge, use `repo_write_finalize_pull_request` to synchronize and switch to the base, then delete only the verified merged feature branch locally and optionally on `origin`. Use `repo_write_sync_base` when cleanup is not intended.
 
 All remote tools are restricted to the configured `origin` on GitHub.com. Push never uses force and refuses `main` or `master`. GitHub API mutations use `GPT_REPO_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN` from the MCP server environment; when none is set, the standard startup scripts reuse the authenticated GitHub CLI session through `gh auth token` without printing or persisting it. Git push authentication uses the machine's configured credential manager or SSH agent.
 
@@ -161,8 +161,8 @@ Codex is done. Review the Codex result and the git diff for <repo_id>.
 | Git review | `repo_git_status`, `repo_git_diff`, `repo_git_review` |
 | File writes | `repo_write_file`, `repo_write_changes` |
 | ChatGPT session continuity | `repo_write_handoff`, `repo_last_write` |
-| Local ship flow | `repo_write_create_branch`, `repo_write_stage`, `repo_write_unstage`, `repo_write_commit`, `repo_write_stage_commit`, `repo_write_recover`, `repo_cleanup_paths` |
-| GitHub remote flow | `repo_remote_status`, `repo_write_push`, `repo_write_pull_request`, `repo_write_merge_pull_request`, `repo_write_sync_base` |
+| Local ship flow | `repo_write_create_branch`, `repo_git_branches`, `repo_write_switch_branch`, `repo_write_stage`, `repo_write_unstage`, `repo_write_commit`, `repo_write_stage_commit`, `repo_write_recover`, `repo_cleanup_paths`, `repo_run_allowed_script` |
+| GitHub remote flow | `repo_remote_status`, `repo_write_push`, `repo_write_pull_request`, `repo_write_merge_pull_request`, `repo_write_finalize_pull_request`, `repo_write_sync_base`, `repo_write_dispatch_workflow` |
 | Compatibility aliases | `repo_git_stage`, `repo_git_unstage`, `repo_git_commit` |
 | Codex/Claude coordination | `repo_prepare_codex_task`, `repo_write_codex_task`, `repo_codex_review` |
 
@@ -221,7 +221,7 @@ GPT Repo MCP is intentionally not a shell runner.
 - Mutating tools are disabled until a repo opts in.
 - File writes are checked against allow/deny policy, path sandboxing, size limits, and secret scanning.
 - Local Git tools operate only on explicit paths and local commits; remote tools use fixed Git arguments and GitHub REST endpoints.
-- There are no generic push/pull/merge, reset, checkout, branch-switch, rebase, stash, force, branch-deletion, shell, or arbitrary-command tools. The only branch-changing tool creates and switches to a brand-new feature branch from an exact reviewed source branch and HEAD. Remote delivery is limited to `origin`, feature-branch push, GitHub PR operations, owner-approved PR merge, and fast-forward base synchronization.
+- There are no generic push/pull/merge, reset, checkout, rebase, stash, force, shell, or arbitrary-command tools. Existing-branch switch and post-merge deletion are fixed-purpose, clean-worktree operations with exact branch/HEAD/PR guards. Allowlisted scripts use server-owned commands and arguments; the optional `github.pr-ready` wrapper delegates one exact, verified draft-ready transition to the authenticated GitHub CLI. Remote delivery remains limited to `origin`, exact PR operations, owner-approved merge, verified cleanup, and locally allowlisted workflow dispatch with exact remote ref-SHA guards.
 
 Read the full model in [docs/SECURITY.md](docs/SECURITY.md).
 
@@ -241,6 +241,7 @@ Read the full model in [docs/SECURITY.md](docs/SECURITY.md).
 | `npm run add -- <path> --mode <mode>` | Add a repository root with explicit `read`, `write`, or `ship` mode. |
 | `npm run remove -- <repo_id>` | Remove an approved repository root. |
 | `npm run check:config` | Validate local config. |
+| `npm run github:pr-ready` | Mark the exact current branch PR ready through authenticated GitHub CLI after fail-closed branch and SHA checks. |
 | `npm test -- tests/tool-contracts.test.ts tests/mcp-contract.test.ts` | Run focused MCP contract checks. |
 
 ## Requirements
@@ -248,6 +249,7 @@ Read the full model in [docs/SECURITY.md](docs/SECURITY.md).
 - Node.js 20 or newer
 - npm
 - git
+- GitHub CLI for the optional `github.pr-ready` wrapper
 - ngrok for the built-in `npm run connect` convenience tunnel, or another HTTPS tunnel for manual setup
 - ChatGPT account with Developer Mode access
 
