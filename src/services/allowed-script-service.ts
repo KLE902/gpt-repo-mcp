@@ -7,9 +7,6 @@ import { OperationsPolicy, type AllowedScriptConfig } from "./operations-policy.
 import { SecretScanner } from "./secret-scanner.js";
 
 export type AllowedScriptProcessResult = {
-export type AllowedScriptProcessRunner = (root: string, script: AllowedScriptConfig, env: NodeJS.ProcessEnv) => Promise<AllowedScriptProcessResult>;
-export type AllowedScriptHeadReader = (root: string) => Promise<string>;
-
   exitCode: number | null;
   stdout: string;
   stderr: string;
@@ -17,6 +14,9 @@ export type AllowedScriptHeadReader = (root: string) => Promise<string>;
   complete: boolean;
   truncated: boolean;
 };
+
+export type AllowedScriptProcessRunner = (root: string, script: AllowedScriptConfig, env: NodeJS.ProcessEnv) => Promise<AllowedScriptProcessResult>;
+export type AllowedScriptHeadReader = (root: string) => Promise<string>;
 
 export class AllowedScriptService {
   private readonly scanner = new SecretScanner();
