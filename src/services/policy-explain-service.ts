@@ -44,6 +44,7 @@ export class PolicyExplainService {
       github_pull_request_enabled: operationsPolicy.config.github_pull_request_enabled,
       github_pull_request_state_enabled: operationsPolicy.config.github_pull_request_state_enabled,
       github_workflow_dispatch_enabled: operationsPolicy.config.github_workflow_dispatch_enabled,
+      allowed_workflow_ids: [...operationsPolicy.config.allowed_workflows].sort(),
       github_merge_enabled: operationsPolicy.config.github_merge_enabled,
       git_sync_enabled: operationsPolicy.config.git_sync_enabled,
       script_run_enabled: operationsPolicy.config.script_run_enabled,

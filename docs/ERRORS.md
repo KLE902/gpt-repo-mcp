@@ -56,6 +56,7 @@ All tool errors return:
 | `GITHUB_PULL_REQUEST_DISABLED` | Pull-request creation or update was requested without its operation toggle. |
 | `GITHUB_PULL_REQUEST_STATE_DISABLED` | Pull-request ready/close was requested without its operation toggle. |
 | `GITHUB_WORKFLOW_DISPATCH_DISABLED` | GitHub Actions dispatch was requested without its operation toggle. |
+| `GITHUB_WORKFLOW_NOT_ALLOWED` | The requested workflow id is not locally allowlisted for this repository. |
 | `GITHUB_MERGE_DISABLED` | Pull-request merge was requested without its operation toggle. |
 | `GIT_SYNC_DISABLED` | Local base synchronization was requested without its operation toggle. |
 | `SCRIPT_RUN_DISABLED` | Allowlisted script execution was requested without its operation toggle. |

@@ -13,7 +13,7 @@ flows. Use `repo_write_stage`, `repo_write_unstage`, `repo_git_restore_paths`,
 `repo_git_stage`, `repo_git_unstage`, and `repo_git_commit` remain available as
 compatibility aliases with the same contracts and safety checks.
 
-For reviewed delivery that begins on a base branch, use `repo_write_create_branch`, review and commit, then `repo_write_push`, `repo_write_pull_request`, optional `repo_write_pull_request_state`, and `repo_remote_status`. Merge only after explicit owner approval with `repo_write_merge_pull_request`, then use `repo_write_finalize_pull_request` for verified base synchronization, switch, and branch cleanup. `repo_git_branches` and `repo_write_switch_branch` support guarded local branch handling. `repo_run_allowed_script` accepts only configured script ids; `repo_write_dispatch_workflow` starts named GitHub Actions workflows.
+For reviewed delivery that begins on a base branch, use `repo_write_create_branch`, review and commit, then `repo_write_push`, `repo_write_pull_request`, optional `repo_write_pull_request_state`, and `repo_remote_status`. Merge only after explicit owner approval with `repo_write_merge_pull_request`, then use `repo_write_finalize_pull_request` for verified base synchronization, switch, and branch cleanup. `repo_git_branches` and `repo_write_switch_branch` support guarded local branch handling. `repo_run_allowed_script` accepts only configured script ids; `repo_write_dispatch_workflow` starts only locally allowlisted GitHub Actions workflows after exact remote ref-SHA validation.
 
 ## Approval Behavior
 
@@ -255,7 +255,7 @@ After GitHub confirms a merge and the owner approves cleanup, verifies the exact
 
 ### `repo_write_dispatch_workflow`
 
-Dispatches a named GitHub Actions `workflow_dispatch` workflow on a fixed ref with bounded string inputs.
+Dispatches a locally allowlisted GitHub Actions `workflow_dispatch` workflow on a validated remote branch with an exact expected SHA and bounded string inputs.
 
 ### `repo_run_allowed_script`
 

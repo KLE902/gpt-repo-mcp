@@ -36,7 +36,7 @@ export const descriptions = {
   repo_write_finalize_pull_request:
     "Use this when GitHub confirms an exact pull request was merged and the owner approved cleanup. Fast-forwards the base, switches to it, and deletes only the verified local and optional origin feature branch.",
   repo_write_dispatch_workflow:
-    "Use this when a named GitHub Actions workflow should be dispatched on a fixed ref with bounded string inputs. Requires dedicated policy opt-in and runtime GitHub authentication.",
+    "Use this when a locally allowlisted GitHub Actions workflow should be dispatched on a remote branch whose exact SHA is known, with bounded string inputs. Requires dedicated policy opt-in and runtime GitHub authentication.",
   repo_run_allowed_script:
     "Use this when a locally configured script id should run with fixed command and arguments. The model cannot supply command text; execution has HEAD guard, timeout, output cap, environment allowlist, redaction, exit code, and completeness reporting.",
   repo_write_sync_base:

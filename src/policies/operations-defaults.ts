@@ -8,6 +8,7 @@ export const DEFAULT_OPERATIONS_POLICY = {
   github_pull_request_enabled: false,
   github_pull_request_state_enabled: false,
   github_workflow_dispatch_enabled: false,
+  allowed_workflows: [],
   github_merge_enabled: false,
   git_sync_enabled: false,
   script_run_enabled: false,

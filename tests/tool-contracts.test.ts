@@ -644,6 +644,7 @@ describe("tool catalog contracts", () => {
       github_pull_request_enabled: false,
       github_pull_request_state_enabled: false,
       github_workflow_dispatch_enabled: false,
+      allowed_workflows: [],
       github_merge_enabled: false,
       git_sync_enabled: false,
       script_run_enabled: false,
@@ -841,7 +842,7 @@ describe("tool catalog contracts", () => {
       {
         name: "repo_write_dispatch_workflow",
         annotations: remoteWriteAnnotations,
-        inputKeys: ["dry_run", "inputs", "reason", "ref", "remote", "repo_id", "workflow_id"],
+        inputKeys: ["dry_run", "expected_ref_sha", "inputs", "reason", "ref", "remote", "repo_id", "workflow_id"],
         outputKeys: ["dispatched", "dry_run", "input_names", "ok", "ref", "warnings", "workflow_id"]
       },
       {

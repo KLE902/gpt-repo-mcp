@@ -280,6 +280,7 @@ export class RemoteGitService {
     this.assertOrigin(input.remote);
     this.policy.assertBranchManageAllowed();
     this.policy.assertSyncAllowed();
+    if (input.delete_remote_branch) this.policy.assertPushAllowed();
     const state = await this.localState(input.expected_head_sha);
     this.assertClean(state.clean);
     const repository = await this.repositoryFor(input.remote);
@@ -342,7 +343,15 @@ export class RemoteGitService {
 
   async dispatchWorkflow(input: WorkflowDispatchInput) {
     this.assertOrigin(input.remote);
-    this.policy.assertWorkflowDispatchAllowed();
+    this.policy.assertWorkflowAllowed(input.workflow_id);
+    await this.validateBranch(input.ref);
+    const remoteRefSha = await this.readRemoteHead(input.remote, input.ref);
+    if (!remoteRefSha) throw new RepoReaderError("GIT_REMOTE_BRANCH_NOT_FOUND", `Remote workflow ref ${input.ref} was not found.`);
+    if (remoteRefSha !== input.expected_ref_sha) {
+      throw new RepoReaderError("GIT_REMOTE_HEAD_MISMATCH", "Remote workflow ref changed before dispatch.", {
+        diagnostics: { expected_head_sha: input.expected_ref_sha, actual_head_sha: remoteRefSha }
+      });
+    }
     const repository = await this.repositoryFor(input.remote);
     const inputNames = Object.keys(input.inputs).sort();
     if (!input.dry_run) await this.github.dispatchWorkflow(repository.owner, repository.name, input.workflow_id, input.ref, input.inputs);

@@ -410,8 +410,14 @@ describe("RemoteGitService", () => {
 
   test("dispatches only the named GitHub workflow and bounded inputs", async () => {
     const requests: Array<{ method: string; url: string; body?: string }> = [];
-    const service = new RemoteGitService("/repo", new OperationsPolicy({ enabled: true, github_workflow_dispatch_enabled: true }), {
-      git_runner: async (args) => args.join(" ") === "remote get-url origin" ? "https://github.com/acme/demo.git" : "",
+    const service = new RemoteGitService("/repo", new OperationsPolicy({ enabled: true, github_workflow_dispatch_enabled: true, allowed_workflows: ["validation.yml"] }), {
+      git_runner: async (args) => {
+        const command = args.join(" ");
+        if (command === "check-ref-format --branch main") return "main";
+        if (command === "ls-remote --heads origin refs/heads/main") return `${HEAD}\trefs/heads/main`;
+        if (command === "remote get-url origin") return "https://github.com/acme/demo.git";
+        throw new Error(`Unexpected git call: ${command}`);
+      },
       env: { GPT_REPO_GITHUB_TOKEN: "fixture-access" },
       fetch_impl: async (input, init) => {
         requests.push({ method: init?.method ?? "GET", url: String(input), body: typeof init?.body === "string" ? init.body : undefined });
@@ -419,11 +425,36 @@ describe("RemoteGitService", () => {
       }
     });
 
-    const output = await service.dispatchWorkflow({ repo_id: "fixture", remote: "origin", workflow_id: "validation.yml", ref: "main", inputs: { profile: "full" }, dry_run: false });
+    const output = await service.dispatchWorkflow({ repo_id: "fixture", remote: "origin", workflow_id: "validation.yml", ref: "main", expected_ref_sha: HEAD, inputs: { profile: "full" }, dry_run: false });
     expect(output).toMatchObject({ dispatched: true, workflow_id: "validation.yml", ref: "main", input_names: ["profile"] });
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({ method: "POST", url: "https://api.github.com/repos/acme/demo/actions/workflows/validation.yml/dispatches" });
     expect(JSON.parse(requests[0]?.body ?? "{}")).toEqual({ ref: "main", inputs: { profile: "full" } });
+  });
+
+  test("rejects workflow ids outside the local allowlist before GitHub access", async () => {
+    const service = new RemoteGitService("/repo", new OperationsPolicy({ enabled: true, github_workflow_dispatch_enabled: true, allowed_workflows: [] }), {
+      git_runner: async () => { throw new Error("git should not run"); }
+    });
+    await expect(service.dispatchWorkflow({
+      repo_id: "fixture", remote: "origin", workflow_id: "validation.yml", ref: "main",
+      expected_ref_sha: HEAD, inputs: {}, dry_run: false
+    })).rejects.toMatchObject({ code: "GITHUB_WORKFLOW_NOT_ALLOWED" });
+  });
+
+  test("rejects workflow dispatch when the remote branch moved", async () => {
+    const service = new RemoteGitService("/repo", new OperationsPolicy({ enabled: true, github_workflow_dispatch_enabled: true, allowed_workflows: ["validation.yml"] }), {
+      git_runner: async (args) => {
+        const command = args.join(" ");
+        if (command === "check-ref-format --branch main") return "main";
+        if (command === "ls-remote --heads origin refs/heads/main") return `${"b".repeat(40)}\trefs/heads/main`;
+        throw new Error(`Unexpected git call: ${command}`);
+      }
+    });
+    await expect(service.dispatchWorkflow({
+      repo_id: "fixture", remote: "origin", workflow_id: "validation.yml", ref: "main",
+      expected_ref_sha: HEAD, inputs: {}, dry_run: false
+    })).rejects.toMatchObject({ code: "GIT_REMOTE_HEAD_MISMATCH" });
   });
 
   test("finalizes a merged pull request by synchronizing base then deleting only verified feature refs", async () => {
@@ -433,7 +464,7 @@ describe("RemoteGitService", () => {
     let remoteFeature = true;
     let localBase = "2".repeat(40);
     const calls: string[][] = [];
-    const service = new RemoteGitService("/repo", new OperationsPolicy({ enabled: true, git_branch_manage_enabled: true, git_sync_enabled: true }), {
+    const service = new RemoteGitService("/repo", new OperationsPolicy({ enabled: true, git_branch_manage_enabled: true, git_push_enabled: true, git_sync_enabled: true }), {
       env: { GPT_REPO_GITHUB_TOKEN: "fixture-access" },
       fetch_impl: async () => jsonResponse(pullFixture({ merged: true, state: "closed", baseSha: baseHead })),
       git_runner: async (args) => {

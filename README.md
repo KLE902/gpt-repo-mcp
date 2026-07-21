@@ -221,7 +221,7 @@ GPT Repo MCP is intentionally not a shell runner.
 - Mutating tools are disabled until a repo opts in.
 - File writes are checked against allow/deny policy, path sandboxing, size limits, and secret scanning.
 - Local Git tools operate only on explicit paths and local commits; remote tools use fixed Git arguments and GitHub REST endpoints.
-- There are no generic push/pull/merge, reset, checkout, rebase, stash, force, shell, or arbitrary-command tools. Existing-branch switch and post-merge deletion are fixed-purpose, clean-worktree operations with exact branch/HEAD/PR guards. Allowlisted scripts use server-owned commands and arguments. Remote delivery remains limited to `origin`, exact PR operations, owner-approved merge, verified cleanup, and named workflow dispatch.
+- There are no generic push/pull/merge, reset, checkout, rebase, stash, force, shell, or arbitrary-command tools. Existing-branch switch and post-merge deletion are fixed-purpose, clean-worktree operations with exact branch/HEAD/PR guards. Allowlisted scripts use server-owned commands and arguments. Remote delivery remains limited to `origin`, exact PR operations, owner-approved merge, verified cleanup, and locally allowlisted workflow dispatch with exact remote ref-SHA guards.
 
 Read the full model in [docs/SECURITY.md](docs/SECURITY.md).
 

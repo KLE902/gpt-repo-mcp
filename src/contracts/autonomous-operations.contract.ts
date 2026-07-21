@@ -108,8 +108,9 @@ export const AllowedScriptResultSchema = z.object({
 
 export const WorkflowDispatchInputSchema = RepoInputSchema.extend({
   remote: RemoteNameSchema.optional().default("origin").describe("Configured GitHub remote, restricted to origin."),
-  workflow_id: z.string().min(1).max(255).regex(/^[A-Za-z0-9][A-Za-z0-9._\/-]*$/).describe("Workflow file name, relative workflow path, or numeric workflow id."),
-  ref: z.string().min(1).max(255).describe("Git ref supplied to the GitHub Actions workflow_dispatch event."),
+  workflow_id: z.string().min(1).max(255).regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/).describe("Locally allowlisted workflow file name or numeric workflow id."),
+  ref: BranchNameSchema.describe("Remote branch supplied to the GitHub Actions workflow_dispatch event."),
+  expected_ref_sha: ShaSchema.describe("Exact remote branch SHA required before workflow dispatch."),
   inputs: z.record(z.string().min(1).max(100), z.string().max(1024)).optional().default({}).describe("Bounded string inputs supplied to the named workflow."),
   dry_run: z.boolean().optional().default(false).describe("Validate remote, workflow id, ref, and inputs without dispatching GitHub Actions."),
   reason: z.string().max(500).optional().describe("Optional concise audit reason for workflow dispatch.")

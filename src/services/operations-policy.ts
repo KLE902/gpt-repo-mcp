@@ -19,6 +19,7 @@ export type OperationsPolicyConfig = {
   github_pull_request_enabled?: boolean;
   github_pull_request_state_enabled?: boolean;
   github_workflow_dispatch_enabled?: boolean;
+  allowed_workflows?: string[];
   github_merge_enabled?: boolean;
   git_sync_enabled?: boolean;
   script_run_enabled?: boolean;
@@ -38,6 +39,7 @@ export type EffectiveOperationsPolicy = {
   github_pull_request_enabled: boolean;
   github_pull_request_state_enabled: boolean;
   github_workflow_dispatch_enabled: boolean;
+  allowed_workflows: string[];
   github_merge_enabled: boolean;
   git_sync_enabled: boolean;
   script_run_enabled: boolean;
@@ -61,6 +63,7 @@ export class OperationsPolicy {
       github_pull_request_enabled: config.github_pull_request_enabled ?? DEFAULT_OPERATIONS_POLICY.github_pull_request_enabled,
       github_pull_request_state_enabled: config.github_pull_request_state_enabled ?? DEFAULT_OPERATIONS_POLICY.github_pull_request_state_enabled,
       github_workflow_dispatch_enabled: config.github_workflow_dispatch_enabled ?? DEFAULT_OPERATIONS_POLICY.github_workflow_dispatch_enabled,
+      allowed_workflows: [...(config.allowed_workflows ?? DEFAULT_OPERATIONS_POLICY.allowed_workflows)],
       github_merge_enabled: config.github_merge_enabled ?? DEFAULT_OPERATIONS_POLICY.github_merge_enabled,
       git_sync_enabled: config.git_sync_enabled ?? DEFAULT_OPERATIONS_POLICY.git_sync_enabled,
       script_run_enabled: config.script_run_enabled ?? DEFAULT_OPERATIONS_POLICY.script_run_enabled,
@@ -108,9 +111,12 @@ export class OperationsPolicy {
     if (!this.config.github_pull_request_state_enabled) throw new RepoReaderError("GITHUB_PULL_REQUEST_STATE_DISABLED", "GitHub pull request state operations are disabled for this repository.");
   }
 
-  assertWorkflowDispatchAllowed(): void {
+  assertWorkflowAllowed(workflowId: string): void {
     this.assertEnabled();
     if (!this.config.github_workflow_dispatch_enabled) throw new RepoReaderError("GITHUB_WORKFLOW_DISPATCH_DISABLED", "GitHub Actions workflow dispatch is disabled for this repository.");
+    if (!this.config.allowed_workflows.includes(workflowId)) {
+      throw new RepoReaderError("GITHUB_WORKFLOW_NOT_ALLOWED", `Workflow ${workflowId} is not allowlisted for this repository.`);
+    }
   }
 
   assertMergeAllowed(): void {

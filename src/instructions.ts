@@ -17,7 +17,7 @@ export const SERVER_INSTRUCTIONS = [
   "For continuity after an interruption or new turn, use repo_last_write to read safe receipt metadata, then repo_git_review for current git truth, then repo_write_stage_commit or repo_write_recover from review payloads.",
   "repo_write_recover is explicit path-only and can unstage, restore worktree paths, and clean configured artifacts; it does not reset, checkout, stash, clean, commit, push, or run shell commands.",
   "repo_run_allowed_script is not a shell. The caller supplies only a configured script_id and exact HEAD; the local config owns the executable, fixed arguments, timeout, output limit, and inherited environment names. Treat timeout, truncation, missing completion, or nonzero exit as a failed script result.",
-  "Use repo_write_dispatch_workflow only for a named workflow_dispatch workflow and bounded string inputs. It runs on GitHub Actions, not automatically on the local PC.",
+  "Use repo_write_dispatch_workflow only for a locally allowlisted workflow_dispatch workflow, a validated remote branch, its exact expected SHA, and bounded string inputs. It runs on GitHub Actions, not automatically on the local PC.",
   "Use repo_plan_review before broad or ambiguous reviews. For code drilldown, use repo_tree for structure, repo_search for locating relevant code, repo_fetch_file for specific files, and repo_read_many only for bounded known sets.",
   "All paths are repo-relative POSIX paths and all repository access is scoped by repo_id.",
   "Default excludes and secret blocking are enforced by the server; do not ask for absolute paths or secrets.",
