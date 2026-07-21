@@ -366,6 +366,111 @@ describe("RemoteGitService", () => {
     expect(requests.some((request) => request.method === "PUT")).toBe(false);
   });
 
+  test("switches only a clean worktree to an existing branch with fixed arguments", async () => {
+    const calls: string[][] = [];
+    let branch = "feature/demo";
+    const service = new RemoteGitService("/repo", new OperationsPolicy({ enabled: true, git_branch_manage_enabled: true }), {
+      git_runner: async (args) => {
+        calls.push(args);
+        const command = args.join(" ");
+        if (command === "rev-parse HEAD") return branch === "main" ? "2".repeat(40) : HEAD;
+        if (command === "symbolic-ref --quiet --short HEAD") return branch;
+        if (command === "status --porcelain=v1 --untracked-files=all") return "";
+        if (command === "check-ref-format --branch main") return "main";
+        if (command === "rev-parse refs/heads/main") return "2".repeat(40);
+        if (command === "switch main") { branch = "main"; return ""; }
+        throw new Error(`Unexpected git call: ${command}`);
+      }
+    });
+
+    const output = await service.switchBranch({ repo_id: "fixture", branch: "main", expected_current_branch: "feature/demo", expected_head_sha: HEAD, dry_run: false });
+    expect(output).toMatchObject({ previous_branch: "feature/demo", branch: "main", switched: true, head_sha: "2".repeat(40) });
+    expect(calls.filter((args) => args[0] === "switch")).toEqual([["switch", "main"]]);
+  });
+
+  test("closes only the exact unmerged pull request head", async () => {
+    const requests: Array<{ method: string; url: string }> = [];
+    const service = new RemoteGitService("/repo", new OperationsPolicy({ enabled: true, github_pull_request_state_enabled: true }), {
+      git_runner: async (args) => args.join(" ") === "remote get-url origin" ? "https://github.com/acme/demo.git" : "",
+      env: { GPT_REPO_GITHUB_TOKEN: "fixture-access" },
+      fetch_impl: async (input, init) => {
+        const url = String(input);
+        const method = init?.method ?? "GET";
+        requests.push({ method, url });
+        if (method === "GET") return jsonResponse(pullFixture());
+        if (method === "PATCH") return jsonResponse(pullFixture({ state: "closed" }));
+        throw new Error(`Unexpected request: ${method} ${url}`);
+      }
+    });
+
+    const output = await service.pullRequestState({ repo_id: "fixture", remote: "origin", pull_number: 7, expected_pull_head_sha: HEAD, action: "close", dry_run: false });
+    expect(output).toMatchObject({ action: "close", changed: true, pull_request: { state: "closed", head_sha: HEAD } });
+    expect(requests.map((request) => request.method)).toEqual(["GET", "PATCH"]);
+  });
+
+  test("dispatches only the named GitHub workflow and bounded inputs", async () => {
+    const requests: Array<{ method: string; url: string; body?: string }> = [];
+    const service = new RemoteGitService("/repo", new OperationsPolicy({ enabled: true, github_workflow_dispatch_enabled: true }), {
+      git_runner: async (args) => args.join(" ") === "remote get-url origin" ? "https://github.com/acme/demo.git" : "",
+      env: { GPT_REPO_GITHUB_TOKEN: "fixture-access" },
+      fetch_impl: async (input, init) => {
+        requests.push({ method: init?.method ?? "GET", url: String(input), body: typeof init?.body === "string" ? init.body : undefined });
+        return new Response(null, { status: 204 });
+      }
+    });
+
+    const output = await service.dispatchWorkflow({ repo_id: "fixture", remote: "origin", workflow_id: "validation.yml", ref: "main", inputs: { profile: "full" }, dry_run: false });
+    expect(output).toMatchObject({ dispatched: true, workflow_id: "validation.yml", ref: "main", input_names: ["profile"] });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ method: "POST", url: "https://api.github.com/repos/acme/demo/actions/workflows/validation.yml/dispatches" });
+    expect(JSON.parse(requests[0]?.body ?? "{}")).toEqual({ ref: "main", inputs: { profile: "full" } });
+  });
+
+  test("finalizes a merged pull request by synchronizing base then deleting only verified feature refs", async () => {
+    const baseHead = "3".repeat(40);
+    let branch = "feature/demo";
+    let localFeature = true;
+    let remoteFeature = true;
+    let localBase = "2".repeat(40);
+    const calls: string[][] = [];
+    const service = new RemoteGitService("/repo", new OperationsPolicy({ enabled: true, git_branch_manage_enabled: true, git_sync_enabled: true }), {
+      env: { GPT_REPO_GITHUB_TOKEN: "fixture-access" },
+      fetch_impl: async () => jsonResponse(pullFixture({ merged: true, state: "closed", baseSha: baseHead })),
+      git_runner: async (args) => {
+        calls.push(args);
+        const command = args.join(" ");
+        if (command === "rev-parse HEAD") return branch === "main" ? localBase : HEAD;
+        if (command === "symbolic-ref --quiet --short HEAD") return branch;
+        if (command === "status --porcelain=v1 --untracked-files=all") return "";
+        if (command === "remote get-url origin") return "https://github.com/acme/demo.git";
+        if (command === "check-ref-format --branch main") return "main";
+        if (command === "check-ref-format --branch feature/demo") return "feature/demo";
+        if (command === "ls-remote --heads origin refs/heads/main") return `${baseHead}\trefs/heads/main`;
+        if (command === "rev-parse refs/heads/feature/demo") {
+          if (!localFeature) throw new Error("missing local feature");
+          return HEAD;
+        }
+        if (command === "ls-remote --heads origin refs/heads/feature/demo") return remoteFeature ? `${HEAD}\trefs/heads/feature/demo` : "";
+        if (command === "rev-parse refs/heads/main") return localBase;
+        if (command === "fetch origin refs/heads/main:refs/heads/main") { localBase = baseHead; return ""; }
+        if (command === "switch main") { branch = "main"; return ""; }
+        if (command === "branch -D feature/demo") { localFeature = false; return ""; }
+        if (command === "push --porcelain origin :refs/heads/feature/demo") { remoteFeature = false; return ""; }
+        throw new Error(`Unexpected git call: ${command}`);
+      }
+    });
+
+    const output = await service.finalizePullRequest({
+      repo_id: "fixture", remote: "origin", pull_number: 7, expected_head_sha: HEAD,
+      expected_pull_head_sha: HEAD, owner_approved: true, delete_remote_branch: true, dry_run: false
+    });
+    expect(output).toMatchObject({ base: "main", base_sha: baseHead, switched_to_base: true, local_branch_deleted: true, remote_branch_deleted: true });
+    expect(calls).toContainEqual(["fetch", "origin", "refs/heads/main:refs/heads/main"]);
+    expect(calls).toContainEqual(["switch", "main"]);
+    expect(calls).toContainEqual(["branch", "-D", "feature/demo"]);
+    expect(calls).toContainEqual(["push", "--porcelain", "origin", ":refs/heads/feature/demo"]);
+  });
+
   test("merge input requires explicit owner approval", () => {
     const withoutApproval = MergePullRequestInputSchema.safeParse({
       repo_id: "fixture",
@@ -386,18 +491,18 @@ describe("RemoteGitService", () => {
   });
 });
 
-function pullFixture(options: { title?: string; base?: string; baseSha?: string; headSha?: string } = {}) {
+function pullFixture(options: { title?: string; base?: string; baseSha?: string; headSha?: string; state?: "open" | "closed"; draft?: boolean; merged?: boolean } = {}) {
   return {
     number: 7,
     title: options.title ?? "Fixture PR",
-    state: "open",
-    draft: false,
+    state: options.state ?? "open",
+    draft: options.draft ?? false,
     html_url: "https://github.com/acme/demo/pull/7",
     head: { ref: "feature/demo", sha: options.headSha ?? HEAD },
     base: { ref: options.base ?? "main", sha: options.baseSha ?? "2".repeat(40) },
     mergeable: true,
     mergeable_state: "clean",
-    merged: false,
+    merged: options.merged ?? false,
     body: null
   };
 }

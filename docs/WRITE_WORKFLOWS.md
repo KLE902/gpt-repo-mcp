@@ -30,13 +30,13 @@ npm run add -- /path/to/repo --mode ship
 
 `write` and `ship` use the same file-write policy. For clone-based solo-dev setup, that policy allows repo-local paths broadly with `allowed_globs: ["**"]` while the hard deny list still blocks `.env*`, private keys, Git internals, dependency directories, generated/cache directories, coverage, test results, and virtual environments. `ship` additionally enables bounded new-branch creation, local stage/commit/recovery, and the separately gated GitHub `origin` workflow.
 
-No mode adds shell execution or arbitrary Git commands. Force-push, direct base-branch push, reset, switching to an existing branch, rebase, stash, `git clean`, and branch deletion remain unavailable. The sole branch-changing operation is fixed creation of a new branch from an exact source branch and HEAD.
+No mode adds arbitrary shell execution or arbitrary Git commands. Force-push, direct base-branch push, reset, rebase, stash, and `git clean` remain unavailable. Ship mode may switch a clean worktree to an existing branch and may delete only a branch proven to match the exact head of a confirmed merged pull request. Allowlisted scripts are a separate local opt-in and accept only a configured script id.
 
 ## Remote GitHub Delivery
 
-When work is still on a base branch, the supported sequence is `repo_write_create_branch` → `repo_git_review` → local commit → `repo_write_push` → `repo_write_pull_request` → `repo_remote_status` → explicit owner approval → `repo_write_merge_pull_request` → `repo_write_sync_base` when needed. If work already starts on a suitable feature branch, skip only the create-branch step.
+When work is still on a base branch, the supported sequence is `repo_write_create_branch` → `repo_git_review` → local commit → `repo_write_push` → `repo_write_pull_request` → optional `repo_write_pull_request_state` → `repo_remote_status` → explicit owner approval → `repo_write_merge_pull_request` → `repo_write_finalize_pull_request`. If work already starts on a suitable feature branch, skip only the create-branch step. Use `repo_write_sync_base` when synchronization without switching or deletion is intended.
 
-Delivery operations are independent opt-ins: `git_branch_enabled`, `git_push_enabled`, `github_pull_request_enabled`, `github_merge_enabled`, and `git_sync_enabled`. Branch creation is local-only and can create, but never reopen, a feature branch. Remote operations accept only the `origin` remote and GitHub.com repository URLs. Push requires a clean named feature branch, exact branch and HEAD guards, and a non-force refspec; `main` and `master` are rejected. PR merge requires `owner_approved: true`, the exact reviewed PR head SHA, and successful known checks by default. Base synchronization is fast-forward only and never changes the checked-out branch.
+Delivery operations are independent opt-ins: `git_branch_enabled`, `git_branch_manage_enabled`, `git_push_enabled`, `github_pull_request_enabled`, `github_pull_request_state_enabled`, `github_workflow_dispatch_enabled`, `github_merge_enabled`, and `git_sync_enabled`. Remote operations accept only `origin` and GitHub.com repository URLs. Push requires a clean named feature branch, exact branch and HEAD guards, and a non-force refspec; `main` and `master` are rejected. PR state and cleanup require the exact PR head. Merge and post-merge deletion require explicit owner approval. Base synchronization is fast-forward only.
 
 GitHub API access first uses `GPT_REPO_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN` in the MCP server environment. If none is present, the standard startup scripts reuse the authenticated GitHub CLI session through `gh auth token` without printing or persisting the value. For a fine-grained token, PR create/update needs Pull requests write, merge needs Contents write, and status inspection needs read access to pull requests, checks, and commit statuses. Git transport authentication is separate and comes from the host Git credential manager or SSH agent.
 
@@ -124,6 +124,32 @@ Exact root public docs (`README.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURIT
 The `npm run add -- <path> --mode write` and `--mode ship` shortcuts intentionally use a broader deny-first solo-dev write policy than the schema default. Hard denied globs and secret/content checks still win. The `gpt-repo` binary is available when the package is linked or installed; clone-based setup should use the npm scripts.
 
 Use `repo_policy_explain` when a read, write, cleanup, or repository-operation policy question is blocked unexpectedly. It reports the effective policies, matched globs, stable block code, local and remote operation toggles, and next safe step without reading or mutating files. For stage, commit, or recovery path blockers, use `repo_git_review` plus the specific local operation tool result.
+
+## Allowlisted Local Scripts
+
+`repo_run_allowed_script` is disabled by default. Enable `script_run_enabled` and configure named entries under `allowed_scripts`. The caller supplies only `script_id` and `expected_head_sha`; command and arguments are fixed in local config.
+
+```json
+{
+  "operations": {
+    "enabled": true,
+    "script_run_enabled": true,
+    "allowed_scripts": {
+      "quality.fast": {
+        "command": "npm.cmd",
+        "args": ["run", "test"],
+        "timeout_ms": 900000,
+        "max_output_bytes": 131072,
+        "inherit_env": []
+      }
+    }
+  }
+}
+```
+
+The runner uses no shell, inherits only a small platform baseline plus configured environment names, and reports exit code, timeout, output truncation, completeness, and sanitized output. Nonzero exit, timeout, or incomplete output is not success.
+
+GitHub-hosted automation uses `repo_write_dispatch_workflow`, which dispatches one named `workflow_dispatch` workflow on a fixed ref with bounded string inputs.
 
 ## Actions
 

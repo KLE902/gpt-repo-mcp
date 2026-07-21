@@ -4,6 +4,14 @@ import { DEFAULT_WRITE_POLICY } from "../policies/write-defaults.js";
 
 const PositiveIntSchema = z.number().int().positive();
 
+export const AllowedScriptConfigSchema = z.object({
+  command: z.string().min(1).max(1024),
+  args: z.array(z.string().max(4096)).max(64).default([]),
+  timeout_ms: z.number().int().min(1000).max(7_200_000).default(900_000),
+  max_output_bytes: z.number().int().min(1024).max(1_048_576).default(131_072),
+  inherit_env: z.array(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/)).max(64).default([])
+}).strict();
+
 export const WritePolicyConfigSchema = z.object({
   enabled: z.boolean().default(DEFAULT_WRITE_POLICY.enabled),
   allowed_globs: z.array(z.string()).default(DEFAULT_WRITE_POLICY.allowed_globs),
@@ -16,10 +24,15 @@ export const OperationsPolicyConfigSchema = z.object({
   git_stage_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.git_stage_enabled),
   git_commit_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.git_commit_enabled),
   git_branch_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.git_branch_enabled),
+  git_branch_manage_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.git_branch_manage_enabled),
   git_push_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.git_push_enabled),
   github_pull_request_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.github_pull_request_enabled),
+  github_pull_request_state_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.github_pull_request_state_enabled),
+  github_workflow_dispatch_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.github_workflow_dispatch_enabled),
   github_merge_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.github_merge_enabled),
   git_sync_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.git_sync_enabled),
+  script_run_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.script_run_enabled),
+  allowed_scripts: z.record(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/), AllowedScriptConfigSchema).default(DEFAULT_OPERATIONS_POLICY.allowed_scripts),
   max_paths_per_operation: PositiveIntSchema.default(DEFAULT_OPERATIONS_POLICY.max_paths_per_operation),
   cleanup_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.cleanup_enabled),
   cleanup_allowed_globs: z.array(z.string()).default(DEFAULT_OPERATIONS_POLICY.cleanup_allowed_globs)

@@ -91,9 +91,9 @@ npm run add -- /path/to/your/repo --mode ship
 
 - `read`: read-only tools.
 - `write`: read tools plus broad repo-local writes guarded by hard denied paths, secret checks, path sandboxing, and size limits.
-- `ship`: write mode plus bounded new feature-branch creation, local Git operations, and the GitHub `origin` workflow.
+- `ship`: write mode plus bounded branch creation/switching, local Git operations, the GitHub `origin` workflow, and verified post-merge cleanup.
 
-No mode enables unrestricted Git or shell execution. Force-push, direct push to `main`/`master`, switching to an existing branch, reset, rebase, stash, `git clean`, and branch deletion remain unavailable. `ship` adds only fixed creation of a brand-new feature branch plus the bounded remote tools.
+No mode enables unrestricted Git or arbitrary shell execution. Force-push, direct push to `main`/`master`, reset, rebase, stash, and `git clean` remain unavailable. Existing-branch switch and post-merge branch deletion are fixed-purpose operations with exact state guards. Allowlisted scripts require separate local configuration.
 
 Permission mode summary:
 
@@ -216,10 +216,15 @@ Enable them per repo in `config.local.json`:
         "git_stage_enabled": true,
         "git_commit_enabled": true,
         "git_branch_enabled": true,
+        "git_branch_manage_enabled": true,
         "git_push_enabled": true,
         "github_pull_request_enabled": true,
+        "github_pull_request_state_enabled": true,
+        "github_workflow_dispatch_enabled": true,
         "github_merge_enabled": true,
         "git_sync_enabled": true,
+        "script_run_enabled": false,
+        "allowed_scripts": {},
         "cleanup_enabled": true
       }
     }

@@ -55,9 +55,9 @@ describe("MCP contract", () => {
         expect(tool.description).toEqual(expect.stringMatching(/^Use this when/));
         expect(tool.inputSchema).toBeDefined();
         expect(tool.outputSchema).toBeDefined();
-        if (tool.name === "repo_remote_status") {
+        if (["repo_remote_status", "repo_git_branches"].includes(tool.name)) {
           expect(tool.annotations).toMatchObject(remoteReadAnnotations);
-        } else if (["repo_write_push", "repo_write_pull_request", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name)) {
+        } else if (["repo_write_push", "repo_write_pull_request", "repo_write_pull_request_state", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name)) {
           expect(tool.annotations).toMatchObject(remoteWriteAnnotations);
         } else if (isMutatingToolName(tool.name)) {
           expect(tool.annotations).toMatchObject(writeAnnotations);
@@ -70,26 +70,37 @@ describe("MCP contract", () => {
     }
   });
 
-  test("tools/list exposes the exact delivery workflow surface", async () => {
+  test("tools/list exposes the exact autonomous delivery workflow surface", async () => {
     const { client, close } = await connectFixtureServer();
     try {
       const listed = await client.listTools();
-      const remote = listed.tools
-        .filter((tool) => ["repo_write_create_branch", "repo_remote_status", "repo_write_push", "repo_write_pull_request", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name))
-        .map((tool) => ({
-          name: tool.name,
-          annotations: tool.annotations,
-          inputKeys: Object.keys(tool.inputSchema.properties ?? {}).sort(),
-          outputKeys: Object.keys(tool.outputSchema?.properties ?? {}).sort()
-        }));
-
-      expect(remote).toEqual([
-        { name: "repo_write_create_branch", annotations: writeAnnotations, inputKeys: ["branch", "dry_run", "expected_head_sha", "expected_source_branch", "reason", "repo_id"], outputKeys: ["branch", "created", "dry_run", "head_sha", "ok", "source_branch", "warnings", "worktree_clean"] },
-        { name: "repo_remote_status", annotations: remoteReadAnnotations, inputKeys: ["pull_number", "remote", "repo_id"], outputKeys: ["ahead", "behind", "branch", "checks", "clean", "head_sha", "ok", "pull_request", "pushed", "remote", "remote_head_sha", "repository", "upstream", "warnings"] },
-        { name: "repo_write_push", annotations: remoteWriteAnnotations, inputKeys: ["dry_run", "expected_branch", "expected_head_sha", "reason", "remote", "repo_id", "set_upstream"], outputKeys: ["branch", "dry_run", "head_sha", "ok", "pushed", "remote", "remote_head_sha", "repository", "upstream", "warnings"] },
-        { name: "repo_write_pull_request", annotations: remoteWriteAnnotations, inputKeys: ["base", "body", "draft", "dry_run", "expected_branch", "expected_head_sha", "reason", "remote", "repo_id", "title"], outputKeys: ["action", "base", "branch", "dry_run", "head_sha", "ok", "pull_request", "remote", "warnings"] },
-        { name: "repo_write_sync_base", annotations: remoteWriteAnnotations, inputKeys: ["base", "dry_run", "expected_head_sha", "reason", "remote", "repo_id"], outputKeys: ["base", "current_branch", "dry_run", "head_sha", "local_base_sha_after", "local_base_sha_before", "ok", "remote", "remote_base_sha", "updated", "warnings"] },
-        { name: "repo_write_merge_pull_request", annotations: remoteWriteAnnotations, inputKeys: ["dry_run", "expected_head_sha", "expected_pull_head_sha", "merge_method", "owner_approved", "pull_number", "reason", "remote", "repo_id", "require_checks_passed", "sync_local_base"], outputKeys: ["checks", "dry_run", "merge_method", "merge_sha", "merged", "message", "ok", "pull_request", "sync", "warnings"] }
+      const deliveryNames = [
+        "repo_write_create_branch",
+        "repo_git_branches",
+        "repo_write_switch_branch",
+        "repo_remote_status",
+        "repo_write_push",
+        "repo_write_pull_request",
+        "repo_write_pull_request_state",
+        "repo_write_finalize_pull_request",
+        "repo_write_dispatch_workflow",
+        "repo_run_allowed_script",
+        "repo_write_sync_base",
+        "repo_write_merge_pull_request"
+      ];
+      const delivery = listed.tools.filter((tool) => deliveryNames.includes(tool.name));
+      expect(delivery.map((tool) => tool.name)).toEqual(deliveryNames);
+      expect(delivery.find((tool) => tool.name === "repo_git_branches")?.annotations).toMatchObject(remoteReadAnnotations);
+      expect(delivery.find((tool) => tool.name === "repo_write_switch_branch")?.annotations).toMatchObject(writeAnnotations);
+      expect(delivery.find((tool) => tool.name === "repo_run_allowed_script")?.annotations).toMatchObject(writeAnnotations);
+      for (const name of ["repo_write_pull_request_state", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow"]) {
+        expect(delivery.find((tool) => tool.name === name)?.annotations).toMatchObject(remoteWriteAnnotations);
+      }
+      expect(Object.keys(delivery.find((tool) => tool.name === "repo_write_finalize_pull_request")?.inputSchema.properties ?? {}).sort()).toEqual([
+        "delete_remote_branch", "dry_run", "expected_head_sha", "expected_pull_head_sha", "owner_approved", "pull_number", "reason", "remote", "repo_id"
+      ]);
+      expect(Object.keys(delivery.find((tool) => tool.name === "repo_run_allowed_script")?.inputSchema.properties ?? {}).sort()).toEqual([
+        "dry_run", "expected_head_sha", "reason", "repo_id", "script_id"
       ]);
     } finally {
       await close();
@@ -101,7 +112,7 @@ describe("MCP contract", () => {
     try {
       const listed = await client.listTools();
 
-      expect(listed.tools.filter((tool) => tool.name !== "repo_remote_status" && !["repo_write_create_branch", "repo_write_push", "repo_write_pull_request", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name)).map((tool) => ({
+      expect(listed.tools.filter((tool) => tool.name !== "repo_remote_status" && !["repo_write_create_branch", "repo_git_branches", "repo_write_switch_branch", "repo_write_push", "repo_write_pull_request", "repo_write_pull_request_state", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_run_allowed_script", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name)).map((tool) => ({
         name: tool.name,
         title: tool.title,
         description: tool.description,
