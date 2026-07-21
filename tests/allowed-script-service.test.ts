@@ -73,6 +73,37 @@ describe("AllowedScriptService", () => {
     }
   });
 
+  test("enforces one UTF-8 byte budget across stdout and stderr", async () => {
+    const boundedPolicy = new OperationsPolicy({
+      enabled: true,
+      script_run_enabled: true,
+      allowed_scripts: {
+        checks: {
+          command: "npm.cmd",
+          args: ["run", "test"],
+          timeout_ms: 30_000,
+          max_output_bytes: 9,
+          inherit_env: []
+        }
+      }
+    });
+    const service = new AllowedScriptService("/repo", boundedPolicy, {}, async () => result({
+      stdout: "éééé",
+      stderr: "XYZ"
+    }), async () => HEAD);
+
+    const output = await service.run({ repo_id: "fixture", script_id: "checks", expected_head_sha: HEAD, dry_run: false });
+    expect(Buffer.byteLength(output.stdout, "utf8") + Buffer.byteLength(output.stderr, "utf8")).toBeLessThanOrEqual(9);
+    expect(output).toMatchObject({
+      stdout: "éééé",
+      stderr: "X",
+      output_truncated: true,
+      complete: false,
+      succeeded: false,
+      warnings: ["SCRIPT_OUTPUT_TRUNCATED"]
+    });
+  });
+
   test("rejects stale HEAD before process execution", async () => {
     let invoked = false;
     const service = new AllowedScriptService("/repo", policy(), {}, async () => {

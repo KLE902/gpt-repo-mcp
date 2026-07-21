@@ -147,7 +147,7 @@ Use `repo_policy_explain` when a read, write, cleanup, or repository-operation p
 }
 ```
 
-The runner uses no shell, inherits only a small platform baseline plus configured environment names, and reports exit code, timeout, output truncation, completeness, and sanitized output. Nonzero exit, timeout, or incomplete output is not success.
+The runner uses no shell, inherits only a small platform baseline plus configured environment names, and reports exit code, timeout, a shared UTF-8 byte cap across stdout/stderr, completeness, and sanitized output. Nonzero exit, timeout, truncation, or incomplete output is not success.
 
 GitHub-hosted automation uses `repo_write_dispatch_workflow`, which dispatches one locally allowlisted `workflow_dispatch` workflow on a validated remote branch only when its exact SHA still matches. Inputs are bounded strings.
 

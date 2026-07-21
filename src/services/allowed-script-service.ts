@@ -88,17 +88,32 @@ function environmentFor(script: AllowedScriptConfig, source: NodeJS.ProcessEnv):
 }
 
 function sanitize(result: AllowedScriptProcessResult, scanner: SecretScanner, limit: number): AllowedScriptProcessResult {
-  const clean = (value: string) => redactSensitiveText(scanner.redact(value)).slice(0, limit);
-  const stdout = clean(result.stdout);
-  const stderr = clean(result.stderr);
-  const sliced = stdout.length < result.stdout.length || stderr.length < result.stderr.length;
+  const cleanStdout = redactSensitiveText(scanner.redact(result.stdout));
+  const cleanStderr = redactSensitiveText(scanner.redact(result.stderr));
+  const stdout = truncateUtf8(cleanStdout, limit);
+  const remainingBytes = Math.max(0, limit - Buffer.byteLength(stdout.value, "utf8"));
+  const stderr = truncateUtf8(cleanStderr, remainingBytes);
+  const truncated = result.truncated || stdout.truncated || stderr.truncated;
   return {
     ...result,
-    stdout,
-    stderr,
-    truncated: result.truncated || sliced,
-    complete: result.complete && !sliced
+    stdout: stdout.value,
+    stderr: stderr.value,
+    truncated,
+    complete: result.complete && !truncated
   };
+}
+
+function truncateUtf8(value: string, maxBytes: number): { value: string; truncated: boolean } {
+  if (Buffer.byteLength(value, "utf8") <= maxBytes) return { value, truncated: false };
+  let bytes = 0;
+  let bounded = "";
+  for (const character of value) {
+    const characterBytes = Buffer.byteLength(character, "utf8");
+    if (bytes + characterBytes > maxBytes) break;
+    bounded += character;
+    bytes += characterBytes;
+  }
+  return { value: bounded, truncated: true };
 }
 
 function emptyResult(): AllowedScriptProcessResult {
