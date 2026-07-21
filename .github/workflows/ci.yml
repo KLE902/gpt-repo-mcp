@@ -2,10 +2,18 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
   push:
     branches:
       - main
       - master
+      - 'feat/**'
+      - 'fix/**'
+
+concurrency:
+  group: ci-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -69,6 +77,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Verify allowlisted npm scripts on Windows
+        run: npm test -- tests/allowed-script-service.test.ts
 
       - name: Install desktop launcher through npm
         shell: powershell
