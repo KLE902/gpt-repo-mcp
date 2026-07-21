@@ -10,7 +10,14 @@ import type {
   RemoteStatusInput,
   SyncBaseInput
 } from "../contracts/remote-git.contract.js";
+import type {
+  BranchListInput,
+  FinalizePullRequestInput,
+  SwitchBranchInput,
+  WorkflowDispatchInput
+} from "../contracts/autonomous-operations.contract.js";
 import { RepoReaderError, toRepoReaderError } from "../runtime/errors.js";
+import { redactSensitiveText } from "../runtime/result-envelope.js";
 import { GitHubClient, type GitHubCheckRun, type GitHubCombinedStatus, type GitHubPull } from "./github-client.js";
 import { OperationsPolicy } from "./operations-policy.js";
 
@@ -95,6 +102,57 @@ export class RemoteGitService {
       created: true,
       worktree_clean: state.clean,
       warnings
+    };
+  }
+
+  async branches(input: BranchListInput) {
+    this.assertOrigin(input.remote);
+    const state = await this.localState();
+    const localOutput = await this.runGit(["for-each-ref", "--format=%(refname:short)%09%(objectname)", "refs/heads"]);
+    const remoteOutput = await this.runGit(["ls-remote", "--heads", input.remote]);
+    return {
+      ok: true as const,
+      remote: input.remote,
+      current_branch: state.branch,
+      head_sha: state.head,
+      clean: state.clean,
+      local_branches: parseBranchLines(localOutput, state.branch, false),
+      remote_branches: parseBranchLines(remoteOutput, state.branch, true),
+      warnings: [] as string[]
+    };
+  }
+
+  async switchBranch(input: SwitchBranchInput) {
+    this.policy.assertBranchManageAllowed();
+    const state = await this.localState(input.expected_head_sha, input.expected_current_branch);
+    this.assertClean(state.clean);
+    await this.validateBranch(input.branch);
+    const target = await this.tryGit(["rev-parse", `refs/heads/${input.branch}`]);
+    if (!target) throw new RepoReaderError("GIT_BRANCH_NOT_FOUND", `Local branch ${input.branch} does not exist.`);
+    if (input.dry_run || input.branch === state.branch) {
+      return {
+        ok: true as const,
+        dry_run: input.dry_run,
+        previous_branch: state.branch,
+        branch: input.branch,
+        head_sha: input.branch === state.branch ? state.head : target,
+        switched: false,
+        warnings: input.branch === state.branch ? ["BRANCH_ALREADY_CHECKED_OUT"] : []
+      };
+    }
+    await this.runGit(["switch", input.branch]);
+    const after = await this.localState();
+    if (after.branch !== input.branch || after.head !== target) {
+      throw new RepoReaderError("GIT_BRANCH_SWITCH_FAILED", "Git did not leave the repository on the expected existing branch and HEAD.");
+    }
+    return {
+      ok: true as const,
+      dry_run: false,
+      previous_branch: state.branch,
+      branch: after.branch,
+      head_sha: after.head,
+      switched: true,
+      warnings: [] as string[]
     };
   }
 
@@ -192,6 +250,88 @@ export class RemoteGitService {
       ...(input.set_upstream ? { upstream: `${input.remote}/${state.branch}` } : {}),
       warnings: []
     };
+  }
+
+  async finalizePullRequest(input: FinalizePullRequestInput) {
+    this.assertOrigin(input.remote);
+    this.policy.assertBranchManageAllowed();
+    this.policy.assertSyncAllowed();
+    if (input.delete_remote_branch) this.policy.assertPushAllowed();
+    const state = await this.localState(input.expected_head_sha);
+    this.assertClean(state.clean);
+    const repository = await this.repositoryFor(input.remote);
+    const pull = await this.github.getPull(repository.owner, repository.name, input.pull_number);
+    if (!pull.merged) throw new RepoReaderError("GITHUB_PR_NOT_MERGED", "Post-merge finalization requires a confirmed merged pull request.");
+    if (pull.head.sha !== input.expected_pull_head_sha) throw new RepoReaderError("GITHUB_PR_HEAD_MISMATCH", "Merged pull request head does not match the approved cleanup SHA.");
+    await this.validateBranch(pull.base.ref);
+    await this.validateBranch(pull.head.ref);
+    const remoteBaseSha = await this.readRemoteHead(input.remote, pull.base.ref);
+    if (!remoteBaseSha) throw new RepoReaderError("GIT_REMOTE_BRANCH_NOT_FOUND", `Remote base branch ${pull.base.ref} was not found.`);
+    const localFeatureSha = await this.tryGit(["rev-parse", `refs/heads/${pull.head.ref}`]);
+    if (localFeatureSha && localFeatureSha !== input.expected_pull_head_sha) {
+      throw new RepoReaderError("GIT_HEAD_MISMATCH", "Local feature branch no longer points to the merged pull-request head.");
+    }
+    const remoteFeatureSha = await this.readRemoteHead(input.remote, pull.head.ref);
+    if (remoteFeatureSha && remoteFeatureSha !== input.expected_pull_head_sha) {
+      throw new RepoReaderError("GIT_REMOTE_HEAD_MISMATCH", "Remote feature branch no longer points to the merged pull-request head.");
+    }
+    if (input.dry_run) {
+      return {
+        ok: true as const, dry_run: true, pull_request: mapPull(pull), base: pull.base.ref, base_sha: remoteBaseSha,
+        switched_to_base: false, local_branch_deleted: false, remote_branch_deleted: false,
+        warnings: [
+          ...(localFeatureSha ? [] : ["LOCAL_BRANCH_ALREADY_ABSENT"]),
+          ...(input.delete_remote_branch && !remoteFeatureSha ? ["REMOTE_BRANCH_ALREADY_ABSENT"] : [])
+        ]
+      };
+    }
+    await this.performSync(input.remote, pull.base.ref, state, false);
+    let switched = false;
+    if (state.branch !== pull.base.ref) {
+      await this.runGit(["switch", pull.base.ref]);
+      switched = true;
+    }
+    const baseState = await this.localState();
+    if (baseState.branch !== pull.base.ref || baseState.head !== remoteBaseSha) {
+      throw new RepoReaderError("GIT_BRANCH_SWITCH_FAILED", "Local base did not match the synchronized remote base after switching.");
+    }
+    let localDeleted = false;
+    if (localFeatureSha && pull.head.ref !== pull.base.ref) {
+      await this.runGit(["branch", "-D", pull.head.ref]);
+      if (await this.tryGit(["rev-parse", `refs/heads/${pull.head.ref}`])) throw new RepoReaderError("GIT_BRANCH_DELETE_FAILED", "Local feature branch still exists after deletion.");
+      localDeleted = true;
+    }
+    let remoteDeleted = false;
+    if (input.delete_remote_branch && remoteFeatureSha && pull.head.ref !== pull.base.ref) {
+      await this.runGit(["push", "--porcelain", input.remote, `:refs/heads/${pull.head.ref}`]);
+      if (await this.readRemoteHead(input.remote, pull.head.ref)) throw new RepoReaderError("GIT_BRANCH_DELETE_FAILED", "Remote feature branch still exists after deletion.");
+      remoteDeleted = true;
+    }
+    return {
+      ok: true as const, dry_run: false, pull_request: mapPull(pull), base: pull.base.ref, base_sha: remoteBaseSha,
+      switched_to_base: switched, local_branch_deleted: localDeleted, remote_branch_deleted: remoteDeleted,
+      warnings: [
+        ...(localFeatureSha ? [] : ["LOCAL_BRANCH_ALREADY_ABSENT"]),
+        ...(input.delete_remote_branch && !remoteFeatureSha ? ["REMOTE_BRANCH_ALREADY_ABSENT"] : [])
+      ]
+    };
+  }
+
+  async dispatchWorkflow(input: WorkflowDispatchInput) {
+    this.assertOrigin(input.remote);
+    this.policy.assertWorkflowAllowed(input.workflow_id);
+    await this.validateBranch(input.ref);
+    const remoteRefSha = await this.readRemoteHead(input.remote, input.ref);
+    if (!remoteRefSha) throw new RepoReaderError("GIT_REMOTE_BRANCH_NOT_FOUND", `Remote workflow ref ${input.ref} was not found.`);
+    if (remoteRefSha !== input.expected_ref_sha) {
+      throw new RepoReaderError("GIT_REMOTE_HEAD_MISMATCH", "Remote workflow ref changed before dispatch.", {
+        diagnostics: { expected_head_sha: input.expected_ref_sha, actual_head_sha: remoteRefSha }
+      });
+    }
+    const repository = await this.repositoryFor(input.remote);
+    const inputNames = Object.keys(input.inputs).sort();
+    if (!input.dry_run) await this.github.dispatchWorkflow(repository.owner, repository.name, input.workflow_id, input.ref, input.inputs);
+    return { ok: true as const, dry_run: input.dry_run, workflow_id: input.workflow_id, ref: input.ref, dispatched: !input.dry_run, input_names: inputNames, warnings: [] as string[] };
   }
 
   async pullRequest(input: PullRequestInput) {
@@ -421,9 +561,15 @@ export class RemoteGitService {
       warnings.push(`COMMIT_STATUS_${toRepoReaderError(error).code}`);
     }
     const items: CheckSummary["items"] = [];
-    for (const run of checkRuns) {
+    for (const run of latestCheckRunsByName(checkRuns)) {
       const state = normalizeCheckRun(run);
-      items.push({ name: run.name, state, ...(run.details_url ? { details_url: run.details_url } : {}) });
+      const summary = checkRunSummary(run);
+      items.push({
+        name: run.name,
+        state,
+        ...(run.details_url ? { details_url: run.details_url } : {}),
+        ...(summary ? { summary } : {})
+      });
     }
     for (const status of combined?.statuses ?? []) {
       const state = status.state === "success" ? "success" : status.state === "pending" ? "pending" : "failure";
@@ -505,6 +651,19 @@ export class RemoteGitService {
   }
 }
 
+function parseBranchLines(output: string, currentBranch: string, remote: boolean) {
+  if (!output.trim()) return [];
+  return output.split(/\r?\n/).filter(Boolean).map((line) => {
+    const parts = line.trim().split(/\s+/);
+    const name = remote ? (parts[1] ?? "").replace(/^refs\/heads\//, "") : parts[0] ?? "";
+    const sha = remote ? parts[0] ?? "" : parts[1] ?? "";
+    if (!name || !/^[a-f0-9]{40}$/i.test(sha)) {
+      throw new RepoReaderError("GIT_ERROR", "Git returned malformed branch information.");
+    }
+    return { name, sha, current: name === currentBranch };
+  }).sort((left, right) => left.name.localeCompare(right.name));
+}
+
 export function parseGitHubRemote(raw: string): GitHubRepository {
   const value = raw.trim();
   let owner: string | undefined;
@@ -550,6 +709,36 @@ function mapPull(pull: GitHubPull): PullRequest {
     mergeable_state: pull.mergeable_state,
     merged: pull.merged
   };
+}
+
+function latestCheckRunsByName(checkRuns: GitHubCheckRun[]): GitHubCheckRun[] {
+  const latest = new Map<string, GitHubCheckRun>();
+  for (const run of checkRuns) {
+    const current = latest.get(run.name);
+    if (!current || checkRunTimestamp(run) > checkRunTimestamp(current)) latest.set(run.name, run);
+  }
+  return [...latest.values()];
+}
+
+function checkRunTimestamp(run: GitHubCheckRun): number {
+  const value = run.completed_at ?? run.started_at;
+  if (!value) return Number.NEGATIVE_INFINITY;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? Number.NEGATIVE_INFINITY : timestamp;
+}
+
+function checkRunSummary(run: GitHubCheckRun): string | undefined {
+  const values = [run.output?.title, run.output?.summary, run.output?.text]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .map((value) => value.trim());
+  if (values.length === 0) return undefined;
+  return [...redactSensitiveText(values.join("\n\n"))]
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return code === 9 || code === 10 || code === 13 || (code >= 32 && code !== 127);
+    })
+    .join("")
+    .slice(0, 4000);
 }
 
 function normalizeCheckRun(run: GitHubCheckRun): "success" | "pending" | "failure" {

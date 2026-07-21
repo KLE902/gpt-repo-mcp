@@ -11,6 +11,8 @@ import {
   gitDiffHandler,
   gitReviewHandler,
   writeCreateBranchHandler,
+  gitBranchesHandler,
+  writeSwitchBranchHandler,
   remoteStatusHandler,
   gitRestorePathsHandler,
   gitStageHandler,
@@ -36,6 +38,9 @@ import {
   policyExplainHandler,
   writePushHandler,
   writePullRequestHandler,
+  writeFinalizePullRequestHandler,
+  writeDispatchWorkflowHandler,
+  runAllowedScriptHandler,
   writeSyncBaseHandler,
   writeMergePullRequestHandler,
   writeStageHandler,
@@ -154,6 +159,24 @@ export const toolCatalog: ToolDefinition[] = [
     handler: writeCreateBranchHandler
   },
   {
+    name: "repo_git_branches",
+    title: "Inspect branches",
+    description: descriptions.repo_git_branches,
+    inputSchema: toolContracts.repo_git_branches.input,
+    outputSchema: toolContracts.repo_git_branches.output,
+    annotations: remoteReadAnnotations,
+    handler: gitBranchesHandler
+  },
+  {
+    name: "repo_write_switch_branch",
+    title: "Switch existing branch",
+    description: descriptions.repo_write_switch_branch,
+    inputSchema: toolContracts.repo_write_switch_branch.input,
+    outputSchema: toolContracts.repo_write_switch_branch.output,
+    annotations: writeAnnotations,
+    handler: writeSwitchBranchHandler
+  },
+  {
     name: "repo_remote_status",
     title: "Inspect GitHub remote status",
     description: descriptions.repo_remote_status,
@@ -179,6 +202,33 @@ export const toolCatalog: ToolDefinition[] = [
     outputSchema: toolContracts.repo_write_pull_request.output,
     annotations: remoteWriteAnnotations,
     handler: writePullRequestHandler
+  },
+  {
+    name: "repo_write_finalize_pull_request",
+    title: "Finalize merged pull request",
+    description: descriptions.repo_write_finalize_pull_request,
+    inputSchema: toolContracts.repo_write_finalize_pull_request.input,
+    outputSchema: toolContracts.repo_write_finalize_pull_request.output,
+    annotations: remoteWriteAnnotations,
+    handler: writeFinalizePullRequestHandler
+  },
+  {
+    name: "repo_write_dispatch_workflow",
+    title: "Dispatch GitHub workflow",
+    description: descriptions.repo_write_dispatch_workflow,
+    inputSchema: toolContracts.repo_write_dispatch_workflow.input,
+    outputSchema: toolContracts.repo_write_dispatch_workflow.output,
+    annotations: remoteWriteAnnotations,
+    handler: writeDispatchWorkflowHandler
+  },
+  {
+    name: "repo_run_allowed_script",
+    title: "Run allowlisted script",
+    description: descriptions.repo_run_allowed_script,
+    inputSchema: toolContracts.repo_run_allowed_script.input,
+    outputSchema: toolContracts.repo_run_allowed_script.output,
+    annotations: writeAnnotations,
+    handler: runAllowedScriptHandler
   },
   {
     name: "repo_write_sync_base",

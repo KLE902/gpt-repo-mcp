@@ -21,12 +21,22 @@ export const descriptions = {
     "Use this when the user asks to review current git changes, recover bad write-tool edits, clean up generated artifacts, prepare staging, or plan a local commit without mutating anything. Workflow hub that returns status, diff summary, warnings, and ready-to-run composite payloads for repo_write_stage_commit and repo_write_recover plus low-level fallback payloads.",
   repo_write_create_branch:
     "Use this when an authorized delivery workflow needs to create and switch to a new local feature branch from the exact current source branch and HEAD. It may carry reviewed staged or unstaged changes, never switches to an existing branch, and never runs arbitrary Git commands.",
+  repo_git_branches:
+    "Use this when current, local, or origin branch names and SHAs must be inspected before switching or post-merge cleanup. Read-only and never changes refs.",
+  repo_write_switch_branch:
+    "Use this when a clean worktree must switch to an existing local branch with exact current branch and HEAD guards. It never creates, resets, rebases, or deletes a branch.",
   repo_remote_status:
     "Use this when the user asks whether a branch is pushed, whether a pull request exists, or whether GitHub checks have passed. Reads the configured GitHub remote and API without mutating local or remote state.",
   repo_write_push:
     "Use this when a reviewed local commit is ready for the routine next step in an authorized delivery workflow. No separate conversational approval is required for pushing the exact current feature branch and HEAD. Requires remote opt-in, a clean worktree, exact branch and HEAD guards, uses fixed git arguments, never force-pushes, and refuses direct push to main or master.",
   repo_write_pull_request:
     "Use this when the exact current branch has been pushed and its GitHub pull request should be created or updated as the routine next step in an authorized delivery workflow. No separate conversational approval is required. Requires remote opt-in, exact branch and HEAD guards, a GitHub remote, and runtime GitHub authentication for mutations.",
+  repo_write_finalize_pull_request:
+    "Use this when GitHub confirms an exact pull request was merged and the owner approved cleanup. Fast-forwards the base, switches to it, and deletes only the verified local and optional origin feature branch.",
+  repo_write_dispatch_workflow:
+    "Use this when a locally allowlisted GitHub Actions workflow should be dispatched on a remote branch whose exact SHA is known, with bounded string inputs. Requires dedicated policy opt-in and runtime GitHub authentication.",
+  repo_run_allowed_script:
+    "Use this when a locally configured script id should run with fixed command and arguments. The model cannot supply command text; execution has HEAD guard, timeout, output cap, environment allowlist, redaction, exit code, and completeness reporting.",
   repo_write_sync_base:
     "Use this when the user asks to update the local main/master base from its configured GitHub remote without switching branches. Uses only fast-forward pull when the base is checked out or a fixed fetch refspec otherwise; never rebases or force-updates.",
   repo_write_merge_pull_request:

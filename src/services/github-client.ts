@@ -29,8 +29,15 @@ const CheckRunsSchema = z.object({
   check_runs: z.array(z.object({
     name: z.string(),
     status: z.enum(["queued", "in_progress", "completed", "waiting", "requested", "pending"]),
+    started_at: z.string().datetime().nullable().optional(),
+    completed_at: z.string().datetime().nullable().optional(),
     conclusion: z.string().nullable().optional(),
-    details_url: z.string().url().nullable().optional()
+    details_url: z.string().url().nullable().optional(),
+    output: z.object({
+      title: z.string().nullable().optional(),
+      summary: z.string().nullable().optional(),
+      text: z.string().nullable().optional()
+    }).optional()
   }))
 });
 
@@ -105,6 +112,14 @@ export class GitHubClient {
       body: input,
       require_auth: true
     }));
+  }
+
+  async dispatchWorkflow(owner: string, repo: string, workflowId: string, ref: string, inputs: Record<string, string>): Promise<void> {
+    await this.request(`/repos/${segment(owner)}/${segment(repo)}/actions/workflows/${segment(workflowId)}/dispatches`, {
+      method: "POST",
+      body: { ref, inputs },
+      require_auth: true
+    });
   }
 
   private async request<T>(path: string, options: { method?: "GET" | "POST" | "PATCH" | "PUT"; body?: unknown; require_auth?: boolean } = {}): Promise<T> {

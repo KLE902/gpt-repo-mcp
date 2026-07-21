@@ -315,6 +315,107 @@ describe("RemoteGitService", () => {
     expect(requestCount).toBe(1);
   });
 
+  test("remote status includes bounded GitHub check output for failed checks", async () => {
+    const service = new RemoteGitService("/repo", new OperationsPolicy(), {
+      env: { GPT_REPO_GITHUB_TOKEN: ["runtime", "fixture"].join("-") },
+      git_runner: async (args) => {
+        const command = args.join(" ");
+        if (command === "rev-parse HEAD") return HEAD;
+        if (command === "symbolic-ref --quiet --short HEAD") return "feature/demo";
+        if (command === "status --porcelain=v1 --untracked-files=all") return "";
+        if (command === "rev-parse --abbrev-ref --symbolic-full-name @{upstream}") throw new Error("no upstream");
+        if (command === "ls-remote --heads origin refs/heads/feature/demo") return `${HEAD}\trefs/heads/feature/demo`;
+        if (command === "remote get-url origin") return "https://github.com/acme/demo.git";
+        throw new Error(`Unexpected git call: ${command}`);
+      },
+      fetch_impl: async (input) => {
+        const url = String(input);
+        if (url.endsWith("/pulls/7")) return jsonResponse(pullFixture());
+        if (url.includes("/check-runs")) {
+          return jsonResponse({
+            check_runs: [{
+              name: "Node 20.x",
+              status: "completed",
+              conclusion: "failure",
+              details_url: "https://github.com/acme/demo/actions/runs/1/job/2",
+              output: {
+                title: "Test failed",
+                summary: "The command npm test exited with code 1.",
+                text: "One test failed in tests/example.test.ts."
+              }
+            }]
+          });
+        }
+        if (url.includes("/status")) return jsonResponse({ state: "success", statuses: [] });
+        throw new Error(`Unexpected request: ${url}`);
+      }
+    });
+
+    const output = await service.status({ repo_id: "fixture", remote: "origin", pull_number: 7 });
+    expect(output.checks).toMatchObject({
+      overall: "failure",
+      failed: 1,
+      items: [{
+        name: "Node 20.x",
+        state: "failure",
+        summary: "Test failed\n\nThe command npm test exited with code 1.\n\nOne test failed in tests/example.test.ts."
+      }]
+    });
+  });
+
+  test("remote status ignores superseded check runs with the same job name", async () => {
+    const service = new RemoteGitService("/repo", new OperationsPolicy(), {
+      env: { GPT_REPO_GITHUB_TOKEN: ["runtime", "fixture"].join("-") },
+      git_runner: async (args) => {
+        const command = args.join(" ");
+        if (command === "rev-parse HEAD") return HEAD;
+        if (command === "symbolic-ref --quiet --short HEAD") return "feature/demo";
+        if (command === "status --porcelain=v1 --untracked-files=all") return "";
+        if (command === "rev-parse --abbrev-ref --symbolic-full-name @{upstream}") throw new Error("no upstream");
+        if (command === "ls-remote --heads origin refs/heads/feature/demo") return `${HEAD}\trefs/heads/feature/demo`;
+        if (command === "remote get-url origin") return "https://github.com/acme/demo.git";
+        throw new Error(`Unexpected git call: ${command}`);
+      },
+      fetch_impl: async (input) => {
+        const url = String(input);
+        if (url.endsWith("/pulls/7")) return jsonResponse(pullFixture());
+        if (url.includes("/check-runs")) {
+          return jsonResponse({
+            check_runs: [
+              {
+                name: "Node 20.x",
+                status: "completed",
+                conclusion: "failure",
+                started_at: "2026-07-21T20:00:00Z",
+                completed_at: "2026-07-21T20:01:00Z",
+                details_url: "https://github.com/acme/demo/actions/runs/1/job/1"
+              },
+              {
+                name: "Node 20.x",
+                status: "completed",
+                conclusion: "success",
+                started_at: "2026-07-21T20:02:00Z",
+                completed_at: "2026-07-21T20:03:00Z",
+                details_url: "https://github.com/acme/demo/actions/runs/2/job/2"
+              }
+            ]
+          });
+        }
+        if (url.includes("/status")) return jsonResponse({ state: "success", statuses: [] });
+        throw new Error(`Unexpected request: ${url}`);
+      }
+    });
+
+    const output = await service.status({ repo_id: "fixture", remote: "origin", pull_number: 7 });
+    expect(output.checks).toMatchObject({
+      overall: "success",
+      total: 1,
+      successful: 1,
+      failed: 0,
+      items: [{ name: "Node 20.x", state: "success" }]
+    });
+  });
+
   test("fails closed when one GitHub check source cannot be read", async () => {
     const requests: Array<{ url: string; method: string }> = [];
     const service = new RemoteGitService("/repo", new OperationsPolicy({
@@ -366,6 +467,122 @@ describe("RemoteGitService", () => {
     expect(requests.some((request) => request.method === "PUT")).toBe(false);
   });
 
+  test("switches only a clean worktree to an existing branch with fixed arguments", async () => {
+    const calls: string[][] = [];
+    let branch = "feature/demo";
+    const service = new RemoteGitService("/repo", new OperationsPolicy({ enabled: true, git_branch_manage_enabled: true }), {
+      git_runner: async (args) => {
+        calls.push(args);
+        const command = args.join(" ");
+        if (command === "rev-parse HEAD") return branch === "main" ? "2".repeat(40) : HEAD;
+        if (command === "symbolic-ref --quiet --short HEAD") return branch;
+        if (command === "status --porcelain=v1 --untracked-files=all") return "";
+        if (command === "check-ref-format --branch main") return "main";
+        if (command === "rev-parse refs/heads/main") return "2".repeat(40);
+        if (command === "switch main") { branch = "main"; return ""; }
+        throw new Error(`Unexpected git call: ${command}`);
+      }
+    });
+
+    const output = await service.switchBranch({ repo_id: "fixture", branch: "main", expected_current_branch: "feature/demo", expected_head_sha: HEAD, dry_run: false });
+    expect(output).toMatchObject({ previous_branch: "feature/demo", branch: "main", switched: true, head_sha: "2".repeat(40) });
+    expect(calls.filter((args) => args[0] === "switch")).toEqual([["switch", "main"]]);
+  });
+
+  test("dispatches only the named GitHub workflow and bounded inputs", async () => {
+    const requests: Array<{ method: string; url: string; body?: string }> = [];
+    const service = new RemoteGitService("/repo", new OperationsPolicy({ enabled: true, github_workflow_dispatch_enabled: true, allowed_workflows: ["validation.yml"] }), {
+      git_runner: async (args) => {
+        const command = args.join(" ");
+        if (command === "check-ref-format --branch main") return "main";
+        if (command === "ls-remote --heads origin refs/heads/main") return `${HEAD}\trefs/heads/main`;
+        if (command === "remote get-url origin") return "https://github.com/acme/demo.git";
+        throw new Error(`Unexpected git call: ${command}`);
+      },
+      env: { GPT_REPO_GITHUB_TOKEN: "fixture-access" },
+      fetch_impl: async (input, init) => {
+        requests.push({ method: init?.method ?? "GET", url: String(input), body: typeof init?.body === "string" ? init.body : undefined });
+        return new Response(null, { status: 204 });
+      }
+    });
+
+    const output = await service.dispatchWorkflow({ repo_id: "fixture", remote: "origin", workflow_id: "validation.yml", ref: "main", expected_ref_sha: HEAD, inputs: { profile: "full" }, dry_run: false });
+    expect(output).toMatchObject({ dispatched: true, workflow_id: "validation.yml", ref: "main", input_names: ["profile"] });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ method: "POST", url: "https://api.github.com/repos/acme/demo/actions/workflows/validation.yml/dispatches" });
+    expect(JSON.parse(requests[0]?.body ?? "{}")).toEqual({ ref: "main", inputs: { profile: "full" } });
+  });
+
+  test("rejects workflow ids outside the local allowlist before GitHub access", async () => {
+    const service = new RemoteGitService("/repo", new OperationsPolicy({ enabled: true, github_workflow_dispatch_enabled: true, allowed_workflows: [] }), {
+      git_runner: async () => { throw new Error("git should not run"); }
+    });
+    await expect(service.dispatchWorkflow({
+      repo_id: "fixture", remote: "origin", workflow_id: "validation.yml", ref: "main",
+      expected_ref_sha: HEAD, inputs: {}, dry_run: false
+    })).rejects.toMatchObject({ code: "GITHUB_WORKFLOW_NOT_ALLOWED" });
+  });
+
+  test("rejects workflow dispatch when the remote branch moved", async () => {
+    const service = new RemoteGitService("/repo", new OperationsPolicy({ enabled: true, github_workflow_dispatch_enabled: true, allowed_workflows: ["validation.yml"] }), {
+      git_runner: async (args) => {
+        const command = args.join(" ");
+        if (command === "check-ref-format --branch main") return "main";
+        if (command === "ls-remote --heads origin refs/heads/main") return `${"b".repeat(40)}\trefs/heads/main`;
+        throw new Error(`Unexpected git call: ${command}`);
+      }
+    });
+    await expect(service.dispatchWorkflow({
+      repo_id: "fixture", remote: "origin", workflow_id: "validation.yml", ref: "main",
+      expected_ref_sha: HEAD, inputs: {}, dry_run: false
+    })).rejects.toMatchObject({ code: "GIT_REMOTE_HEAD_MISMATCH" });
+  });
+
+  test("finalizes a merged pull request by synchronizing base then deleting only verified feature refs", async () => {
+    const baseHead = "3".repeat(40);
+    let branch = "feature/demo";
+    let localFeature = true;
+    let remoteFeature = true;
+    let localBase = "2".repeat(40);
+    const calls: string[][] = [];
+    const service = new RemoteGitService("/repo", new OperationsPolicy({ enabled: true, git_branch_manage_enabled: true, git_push_enabled: true, git_sync_enabled: true }), {
+      env: { GPT_REPO_GITHUB_TOKEN: "fixture-access" },
+      fetch_impl: async () => jsonResponse({ ...pullFixture({ state: "closed", baseSha: baseHead }), merged: true }),
+      git_runner: async (args) => {
+        calls.push(args);
+        const command = args.join(" ");
+        if (command === "rev-parse HEAD") return branch === "main" ? localBase : HEAD;
+        if (command === "symbolic-ref --quiet --short HEAD") return branch;
+        if (command === "status --porcelain=v1 --untracked-files=all") return "";
+        if (command === "remote get-url origin") return "https://github.com/acme/demo.git";
+        if (command === "check-ref-format --branch main") return "main";
+        if (command === "check-ref-format --branch feature/demo") return "feature/demo";
+        if (command === "ls-remote --heads origin refs/heads/main") return `${baseHead}\trefs/heads/main`;
+        if (command === "rev-parse refs/heads/feature/demo") {
+          if (!localFeature) throw new Error("missing local feature");
+          return HEAD;
+        }
+        if (command === "ls-remote --heads origin refs/heads/feature/demo") return remoteFeature ? `${HEAD}\trefs/heads/feature/demo` : "";
+        if (command === "rev-parse refs/heads/main") return localBase;
+        if (command === "fetch origin refs/heads/main:refs/heads/main") { localBase = baseHead; return ""; }
+        if (command === "switch main") { branch = "main"; return ""; }
+        if (command === "branch -D feature/demo") { localFeature = false; return ""; }
+        if (command === "push --porcelain origin :refs/heads/feature/demo") { remoteFeature = false; return ""; }
+        throw new Error(`Unexpected git call: ${command}`);
+      }
+    });
+
+    const output = await service.finalizePullRequest({
+      repo_id: "fixture", remote: "origin", pull_number: 7, expected_head_sha: HEAD,
+      expected_pull_head_sha: HEAD, owner_approved: true, delete_remote_branch: true, dry_run: false
+    });
+    expect(output).toMatchObject({ base: "main", base_sha: baseHead, switched_to_base: true, local_branch_deleted: true, remote_branch_deleted: true });
+    expect(calls).toContainEqual(["fetch", "origin", "refs/heads/main:refs/heads/main"]);
+    expect(calls).toContainEqual(["switch", "main"]);
+    expect(calls).toContainEqual(["branch", "-D", "feature/demo"]);
+    expect(calls).toContainEqual(["push", "--porcelain", "origin", ":refs/heads/feature/demo"]);
+  });
+
   test("merge input requires explicit owner approval", () => {
     const withoutApproval = MergePullRequestInputSchema.safeParse({
       repo_id: "fixture",
@@ -386,11 +603,11 @@ describe("RemoteGitService", () => {
   });
 });
 
-function pullFixture(options: { title?: string; base?: string; baseSha?: string; headSha?: string } = {}) {
+function pullFixture(options: { title?: string; base?: string; baseSha?: string; headSha?: string; state?: "open" | "closed"; draft?: boolean; merged?: boolean } = {}) {
   return {
     number: 7,
     title: options.title ?? "Fixture PR",
-    state: "open",
+    state: options.state ?? "open",
     draft: false,
     html_url: "https://github.com/acme/demo/pull/7",
     head: { ref: "feature/demo", sha: options.headSha ?? HEAD },

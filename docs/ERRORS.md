@@ -51,15 +51,24 @@ All tool errors return:
 | `GIT_STAGE_DISABLED` | Git stage or unstage was requested without stage operations enabled. |
 | `GIT_COMMIT_DISABLED` | Git commit was requested without commit operations enabled. |
 | `GIT_BRANCH_CREATE_DISABLED` | New feature-branch creation was requested without `operations.git_branch_enabled`. |
+| `GIT_BRANCH_MANAGE_DISABLED` | Existing-branch switch or verified post-merge cleanup was requested without `operations.git_branch_manage_enabled`. |
 | `GIT_PUSH_DISABLED` | Push was requested without `operations.git_push_enabled`. |
 | `GITHUB_PULL_REQUEST_DISABLED` | Pull-request creation or update was requested without its operation toggle. |
+| `GITHUB_WORKFLOW_DISPATCH_DISABLED` | GitHub Actions dispatch was requested without its operation toggle. |
+| `GITHUB_WORKFLOW_NOT_ALLOWED` | The requested workflow id is not locally allowlisted for this repository. |
 | `GITHUB_MERGE_DISABLED` | Pull-request merge was requested without its operation toggle. |
 | `GIT_SYNC_DISABLED` | Local base synchronization was requested without its operation toggle. |
+| `SCRIPT_RUN_DISABLED` | Allowlisted script execution was requested without its operation toggle. |
+| `SCRIPT_NOT_ALLOWED` | The requested script id is not configured for the repository. |
+| `SCRIPT_RUNTIME_UNAVAILABLE` | A configured script depends on unavailable runtime bootstrap metadata, such as `npm_execpath` for shell-free `npm.cmd` execution on Windows. |
 | `GIT_WORKTREE_DIRTY` | A remote mutation or base synchronization that requires a clean repository found staged or unstaged changes. New-branch creation is the deliberate exception. |
 | `GIT_BRANCH_MISMATCH` | Current branch did not match the supplied exact expected branch. |
 | `GIT_BRANCH_INVALID` | A supplied branch name was invalid or was an explicitly prohibited base-branch target. |
 | `GIT_BRANCH_EXISTS` | `repo_write_create_branch` was asked to create a local branch that already exists. The tool never switches to existing branches. |
 | `GIT_BRANCH_CREATE_FAILED` | Git did not leave the repository on the expected new branch with unchanged HEAD. |
+| `GIT_BRANCH_NOT_FOUND` | The requested existing local branch was not found. |
+| `GIT_BRANCH_SWITCH_FAILED` | Git did not leave the repository on the verified target branch and HEAD. |
+| `GIT_BRANCH_DELETE_FAILED` | A verified local or remote feature branch still existed after deletion was attempted. |
 | `GIT_DETACHED_HEAD` | A delivery operation requires a named current branch but the repository is detached. |
 | `GIT_REMOTE_NOT_GITHUB` | The configured remote was not a supported credential-free GitHub HTTPS or SSH repository URL. |
 | `GIT_REMOTE_NOT_ALLOWED` | A remote other than the configured `origin` was requested. |
@@ -70,6 +79,7 @@ All tool errors return:
 | `GITHUB_API_ERROR` | A GitHub API request failed and was returned as a sanitized error. |
 | `GITHUB_PR_HEAD_MISMATCH` | The pull-request head changed after owner review. Review the new head before merging. |
 | `GITHUB_PR_NOT_OPEN` | The requested pull request is not open for this merge workflow. |
+| `GITHUB_PR_NOT_MERGED` | Post-merge finalization was requested for a pull request GitHub has not confirmed as merged. |
 | `GITHUB_PR_NOT_MERGEABLE` | GitHub reports that the pull request cannot currently be merged. |
 | `GITHUB_CHECKS_NOT_PASSED` | Required known checks were not successful, so merge was not attempted. |
 | `GITHUB_MERGE_REJECTED` | GitHub rejected the requested pull-request merge. |

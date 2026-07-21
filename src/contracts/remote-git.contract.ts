@@ -30,7 +30,8 @@ export const CheckSummarySchema = z.object({
   items: z.array(z.object({
     name: z.string().describe("Check run name or commit status context."),
     state: z.enum(["success", "pending", "failure"]).describe("Normalized result for this check item."),
-    details_url: z.string().url().optional().describe("Optional GitHub or CI details URL.")
+    details_url: z.string().url().optional().describe("Optional GitHub or CI details URL."),
+    summary: z.string().optional().describe("Bounded sanitized check-run output summary when GitHub exposes one.")
   })).describe("Normalized individual check and status results.")
 });
 

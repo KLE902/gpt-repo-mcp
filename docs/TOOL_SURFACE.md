@@ -13,11 +13,11 @@ flows. Use `repo_write_stage`, `repo_write_unstage`, `repo_git_restore_paths`,
 `repo_git_stage`, `repo_git_unstage`, and `repo_git_commit` remain available as
 compatibility aliases with the same contracts and safety checks.
 
-For reviewed delivery that begins on a base branch, first use `repo_write_create_branch` to create and switch to a brand-new feature branch from the exact current source branch and HEAD. Continue with `repo_write_push`,
-`repo_write_pull_request`, `repo_remote_status`, and—only after explicit owner
-approval—`repo_write_merge_pull_request`. Use `repo_write_sync_base` for a
-separate fast-forward local base update. The branch tool is local-only. The remote tools are open-world because
-they access `origin` and GitHub, but they remain fixed-purpose and policy-gated.
+For reviewed delivery that begins on a base branch, use `repo_write_create_branch`, review and commit, then `repo_write_push`, `repo_write_pull_request`, and `repo_remote_status`. Use the installed GitHub integration or GitHub CLI for draft-ready and close operations. Merge only after explicit owner approval with `repo_write_merge_pull_request`, then use `repo_write_finalize_pull_request` for verified base synchronization, switch, and branch cleanup. `repo_git_branches` and `repo_write_switch_branch` support guarded local branch handling. `repo_run_allowed_script` accepts only configured script ids; `repo_write_dispatch_workflow` starts only locally allowlisted GitHub Actions workflows after exact remote ref-SHA validation.
+
+
+
+
 
 ## Approval Behavior
 
@@ -229,6 +229,14 @@ Example:
 }
 ```
 
+### `repo_git_branches`
+
+Reads the current branch, clean state, and deterministically sorted local and `origin` branch names and SHAs. It never changes refs.
+
+### `repo_write_switch_branch`
+
+Switches a clean worktree to an existing local branch after exact current branch and HEAD validation. It never creates, resets, rebases, or deletes a branch.
+
 ### `repo_remote_status`
 
 Reads the configured `origin`, current branch/HEAD/clean state, upstream divergence, matching GitHub pull request, and normalized checks. It is read-only but has `openWorldHint: true` because it accesses GitHub and the Git remote.
@@ -240,6 +248,36 @@ Pushes the exact reviewed clean feature branch and HEAD to `origin` with a fixed
 ### `repo_write_pull_request`
 
 Creates or updates the open GitHub pull request for the exact pushed branch. It requires the remote branch SHA to match local HEAD. Title, optional body, base, and draft-on-create are typed inputs; an existing draft state is not silently changed.
+
+### `repo_write_finalize_pull_request`
+
+After GitHub confirms a merge and the owner approves cleanup, verifies the exact PR head, local and remote feature refs, synchronizes the base, switches to it, and deletes only the verified feature branch locally and optionally on `origin`.
+
+### `repo_write_dispatch_workflow`
+
+Dispatches a locally allowlisted GitHub Actions `workflow_dispatch` workflow on a validated remote branch with an exact expected SHA and bounded string inputs.
+
+### `repo_run_allowed_script`
+
+Runs a locally configured script id. The caller cannot provide executable or arguments. Exact HEAD, timeout, output cap, restricted environment, output redaction, exit code, and completeness are enforced.
+
+On Windows, `npm.cmd` configurations remain shell-free: the server resolves them through the active Node.js executable and npm CLI path established by `npm run connect`. Missing runtime metadata fails closed.
+
+The included `scripts/github-pr-ready.mjs` wrapper can be configured as `github.pr-ready`. It requires a clean named feature branch, derives the GitHub repository from `origin`, verifies that the open PR branch and head SHA exactly match local HEAD, runs the authenticated GitHub CLI command `gh pr ready`, re-reads the PR, and fails closed on any mismatch. Repeated execution is idempotent when the PR is already ready. A typical repository-local configuration is:
+
+```json
+{
+  "github.pr-ready": {
+    "command": "npm.cmd",
+    "args": ["run", "github:pr-ready"],
+    "timeout_ms": 120000,
+    "max_output_bytes": 131072,
+    "inherit_env": []
+  }
+}
+```
+
+For another approved repository, configure `node` with an absolute local path to this fixed wrapper while keeping the target repository as the script working directory. No PR number, branch, repository, executable, or argument is supplied by the model.
 
 ### `repo_write_sync_base`
 
@@ -697,7 +735,8 @@ Ship/current changes:
 2. If the work is on `main`/`master`, call `repo_write_create_branch` with the exact source branch and HEAD before committing. Skip this only when already on the intended feature branch.
 3. Review and commit the exact changed paths; use granular stage plus commit when some paths were already staged.
 4. Push with `repo_write_push`, create/update the PR with `repo_write_pull_request`, and inspect it with `repo_remote_status`.
-5. Stop for explicit owner approval before `repo_write_merge_pull_request`; synchronize the local base with `repo_write_sync_base` when needed.
+5. When `github.pr-ready` is configured, run it through `repo_run_allowed_script` with the exact current HEAD, then inspect the PR and checks again with `repo_remote_status`. This removes the manual Ready for review click without adding a duplicate GitHub mutation tool.
+6. Stop for explicit owner approval before `repo_write_merge_pull_request`; synchronize the local base with `repo_write_sync_base` when needed.
 
 Stage and commit reviewed changes:
 
