@@ -17,6 +17,7 @@ import type {
   WorkflowDispatchInput
 } from "../contracts/autonomous-operations.contract.js";
 import { RepoReaderError, toRepoReaderError } from "../runtime/errors.js";
+import { redactSensitiveText } from "../runtime/result-envelope.js";
 import { GitHubClient, type GitHubCheckRun, type GitHubCombinedStatus, type GitHubPull } from "./github-client.js";
 import { OperationsPolicy } from "./operations-policy.js";
 
@@ -560,9 +561,15 @@ export class RemoteGitService {
       warnings.push(`COMMIT_STATUS_${toRepoReaderError(error).code}`);
     }
     const items: CheckSummary["items"] = [];
-    for (const run of checkRuns) {
+    for (const run of latestCheckRunsByName(checkRuns)) {
       const state = normalizeCheckRun(run);
-      items.push({ name: run.name, state, ...(run.details_url ? { details_url: run.details_url } : {}) });
+      const summary = checkRunSummary(run);
+      items.push({
+        name: run.name,
+        state,
+        ...(run.details_url ? { details_url: run.details_url } : {}),
+        ...(summary ? { summary } : {})
+      });
     }
     for (const status of combined?.statuses ?? []) {
       const state = status.state === "success" ? "success" : status.state === "pending" ? "pending" : "failure";
@@ -702,6 +709,36 @@ function mapPull(pull: GitHubPull): PullRequest {
     mergeable_state: pull.mergeable_state,
     merged: pull.merged
   };
+}
+
+function latestCheckRunsByName(checkRuns: GitHubCheckRun[]): GitHubCheckRun[] {
+  const latest = new Map<string, GitHubCheckRun>();
+  for (const run of checkRuns) {
+    const current = latest.get(run.name);
+    if (!current || checkRunTimestamp(run) > checkRunTimestamp(current)) latest.set(run.name, run);
+  }
+  return [...latest.values()];
+}
+
+function checkRunTimestamp(run: GitHubCheckRun): number {
+  const value = run.completed_at ?? run.started_at;
+  if (!value) return Number.NEGATIVE_INFINITY;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? Number.NEGATIVE_INFINITY : timestamp;
+}
+
+function checkRunSummary(run: GitHubCheckRun): string | undefined {
+  const values = [run.output?.title, run.output?.summary, run.output?.text]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .map((value) => value.trim());
+  if (values.length === 0) return undefined;
+  return [...redactSensitiveText(values.join("\n\n"))]
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return code === 9 || code === 10 || code === 13 || (code >= 32 && code !== 127);
+    })
+    .join("")
+    .slice(0, 4000);
 }
 
 function normalizeCheckRun(run: GitHubCheckRun): "success" | "pending" | "failure" {

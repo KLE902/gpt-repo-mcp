@@ -8,8 +8,6 @@ on:
     branches:
       - main
       - master
-      - 'feat/**'
-      - 'fix/**'
 
 concurrency:
   group: ci-${{ github.event.pull_request.head.ref || github.ref_name }}
