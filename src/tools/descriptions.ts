@@ -43,6 +43,8 @@ export const descriptions = {
     "Use this when a locally configured script id should run with fixed command and arguments. The model cannot supply command text; execution has HEAD guard, timeout, output cap, environment allowlist, redaction, exit code, and completeness reporting.",
   repo_write_sync_base:
     "Use this when the user asks to update the local main/master base from its configured GitHub remote without switching branches. Uses only fast-forward pull when the base is checked out or a fixed fetch refspec otherwise; never rebases or force-updates.",
+  repo_write_update_branch_from_base:
+    "Use this when a clean checked-out feature branch must incorporate an exact current origin base SHA. Performs merge-tree conflict preflight, returns bounded conflict files without entering merge state, and then uses only fixed fast-forward or merge arguments; never rebases, cherry-picks, force-updates, pushes, or leaves a failed merge active.",
   repo_write_merge_pull_request:
     "Use this when the owner has explicitly approved merging a specific GitHub pull request. Requires owner_approved true, exact local and PR head SHAs, remote merge opt-in, successful checks by default, and optionally fast-forwards the local base after GitHub confirms the merge.",
   repo_git_stage:

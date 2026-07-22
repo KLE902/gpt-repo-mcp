@@ -44,6 +44,7 @@ import {
   writeDispatchWorkflowHandler,
   runAllowedScriptHandler,
   writeSyncBaseHandler,
+  writeUpdateBranchFromBaseHandler,
   writeMergePullRequestHandler,
   writeStageHandler,
   writeUnstageHandler,
@@ -258,6 +259,15 @@ export const toolCatalog: ToolDefinition[] = [
     outputSchema: toolContracts.repo_write_sync_base.output,
     annotations: remoteWriteAnnotations,
     handler: writeSyncBaseHandler
+  },
+  {
+    name: "repo_write_update_branch_from_base",
+    title: "Update feature branch from base",
+    description: descriptions.repo_write_update_branch_from_base,
+    inputSchema: toolContracts.repo_write_update_branch_from_base.input,
+    outputSchema: toolContracts.repo_write_update_branch_from_base.output,
+    annotations: remoteWriteAnnotations,
+    handler: writeUpdateBranchFromBaseHandler
   },
   {
     name: "repo_write_merge_pull_request",

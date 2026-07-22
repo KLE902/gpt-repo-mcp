@@ -118,7 +118,7 @@ export class OperationsPolicy {
 
   assertSyncAllowed(): void {
     this.assertEnabled();
-    if (!this.config.git_sync_enabled) throw new RepoReaderError("GIT_SYNC_DISABLED", "Local base synchronization is disabled for this repository.");
+    if (!this.config.git_sync_enabled) throw new RepoReaderError("GIT_SYNC_DISABLED", "Guarded Git synchronization is disabled for this repository.");
   }
 
   getAllowedScript(scriptId: string): AllowedScriptConfig {
