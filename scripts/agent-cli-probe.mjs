@@ -367,6 +367,7 @@ function assertCommandSucceeded(result, code, message) {
   if (result?.exitCode !== 0) {
     throw operationError(code, message, {
       exit_code: result?.exitCode ?? null,
+      stdout: String(result?.stdout ?? "").slice(-4096),
       stderr: String(result?.stderr ?? "").slice(-4096)
     });
   }

@@ -244,6 +244,28 @@ describe("agent-cli-probe", () => {
       .toThrow(/missing required non-interactive capabilities/);
   });
 
+  test("preserves bounded structured stdout diagnostics for nonzero provider exits", async () => {
+    const help = "-p --output-format --permission-mode --disallowedTools";
+    const runner = queuedRunner([
+      commandResult(`${HEAD}\n`),
+      commandResult(""),
+      commandResult("2.1.89\n"),
+      commandResult(help),
+      commandResult('{"type":"result","is_error":true,"result":"probe failed"}\n', { exitCode: 1 })
+    ]);
+
+    await expect(probeAgentCli({
+      provider: "claude",
+      cwd: "/repo",
+      platform: "linux",
+      runCommand: runner.run,
+      resolveCli: async () => "/usr/bin/claude"
+    })).rejects.toMatchObject({
+      code: "CLI_PROBE_FAILED",
+      details: { stdout: expect.stringContaining("probe failed") }
+    });
+  });
+
   test("validates structured provider output and rejects missing markers", () => {
     expect(() => validateProbeOutput("claude", JSON.stringify({ type: "result", is_error: false, result: "PKR_CLAUDE_PROBE_OK" })))
       .not.toThrow();
