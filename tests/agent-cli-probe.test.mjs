@@ -5,6 +5,7 @@ import {
   knownWindowsCliCandidates,
   probeAgentCli,
   resolveExecutableInvocation,
+  selectCliCandidate,
   validateProbeOutput
 } from "../scripts/agent-cli-probe.mjs";
 
@@ -86,6 +87,15 @@ describe("agent-cli-probe", () => {
       "C:\\Users\\fixture\\AppData\\Roaming\\npm\\claude.cmd",
       "C:\\Users\\fixture\\AppData\\Local\\Programs\\claude\\claude.exe"
     ]);
+  });
+
+  test("prefers the npm command shim for Claude and native executables for other providers", () => {
+    const candidates = [
+      "C:\\Users\\fixture\\.local\\bin\\claude.exe",
+      "C:\\Users\\fixture\\AppData\\Roaming\\npm\\claude.cmd"
+    ];
+    expect(selectCliCandidate("claude", candidates)).toBe(candidates[1]);
+    expect(selectCliCandidate("codex", candidates)).toBe(candidates[0]);
   });
 
   test("runs the verified npm Claude entry through Node without cmd.exe quoting", () => {

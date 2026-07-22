@@ -235,15 +235,21 @@ async function resolveCliCommand(name, runCommand, platform) {
     if (existsSync(path) && !candidates.includes(path)) candidates.push(path);
   }
 
-  const candidate = candidates.find((value) => value.toLowerCase().endsWith(".exe"))
-    ?? candidates.find((value) => /\.(cmd|bat)$/i.test(value))
-    ?? candidates[0];
+  const candidate = selectCliCandidate(name, candidates);
   if (!candidate) {
     throw operationError("CLI_NOT_FOUND", `Could not locate ${name} on PATH or in supported Windows install locations.`, {
       locator_exit_code: result?.exitCode ?? null
     });
   }
   return candidate;
+}
+
+export function selectCliCandidate(name, candidates) {
+  const commandShim = candidates.find((value) => /\.(cmd|bat)$/i.test(value));
+  const executable = candidates.find((value) => value.toLowerCase().endsWith(".exe"));
+  return name === "claude"
+    ? commandShim ?? executable ?? candidates[0]
+    : executable ?? commandShim ?? candidates[0];
 }
 
 export function knownWindowsCliCandidates(name, platform = globalThis.process.platform, env = globalThis.process.env) {
