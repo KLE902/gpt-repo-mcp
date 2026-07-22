@@ -217,6 +217,11 @@ async function readGitState(cwd, runCommand) {
 }
 
 async function resolveCliCommand(name, runCommand, platform) {
+  if (name === "claude") {
+    const packageEntry = await resolveGlobalNpmClaudeEntry(runCommand, platform);
+    if (packageEntry) return packageEntry;
+  }
+
   const locator = platform === "win32" ? "where.exe" : "which";
   const result = await runCommand(locator, [name], { timeoutMs: 10_000, maxOutputBytes: 65_536 });
   if (result?.timedOut || result?.truncated || result?.complete === false) {
@@ -242,6 +247,32 @@ async function resolveCliCommand(name, runCommand, platform) {
     });
   }
   return candidate;
+}
+
+export async function resolveGlobalNpmClaudeEntry(
+  runCommand,
+  platform = globalThis.process.platform,
+  env = globalThis.process.env,
+  fileExists = existsSync,
+  nodeExecutable = globalThis.process.execPath
+) {
+  if (platform !== "win32") return null;
+  const npmCliCandidates = [
+    String(env.npm_execpath ?? "").trim(),
+    join(dirname(nodeExecutable), "node_modules", "npm", "bin", "npm-cli.js")
+  ].filter(Boolean);
+  const npmCli = npmCliCandidates.find((value) => fileExists(value));
+  if (!npmCli) return null;
+
+  const result = await runCommand(nodeExecutable, [npmCli, "root", "-g"], {
+    timeoutMs: 30_000,
+    maxOutputBytes: 65_536
+  });
+  if (result?.exitCode !== 0 || result?.timedOut || result?.truncated || result?.complete === false) return null;
+  const root = String(result.stdout ?? "").trim();
+  if (!root || /[\r\n]/.test(root)) return null;
+  const entry = join(root, "@anthropic-ai", "claude-code", "cli.js");
+  return fileExists(entry) ? entry : null;
 }
 
 export function selectCliCandidate(name, candidates) {

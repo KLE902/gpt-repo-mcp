@@ -5,6 +5,7 @@ import {
   knownWindowsCliCandidates,
   probeAgentCli,
   resolveExecutableInvocation,
+  resolveGlobalNpmClaudeEntry,
   selectCliCandidate,
   validateProbeOutput
 } from "../scripts/agent-cli-probe.mjs";
@@ -88,6 +89,28 @@ describe("agent-cli-probe", () => {
       "C:\\Users\\fixture\\AppData\\Roaming\\npm\\node_modules\\@anthropic-ai\\claude-code\\cli.js",
       "C:\\Users\\fixture\\AppData\\Local\\Programs\\claude\\claude.exe"
     ]);
+  });
+
+  test("resolves the installed Claude package from npm's exact global root", async () => {
+    const npmCli = "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js";
+    const globalRoot = "D:\\npm-global\\node_modules";
+    const entry = `${globalRoot}\\@anthropic-ai\\claude-code\\cli.js`;
+    const calls = [];
+    const result = await resolveGlobalNpmClaudeEntry(
+      async (command, args) => {
+        calls.push({ command, args });
+        return commandResult(`${globalRoot}\n`);
+      },
+      "win32",
+      {},
+      (path) => path === npmCli || path === entry,
+      "C:\\Program Files\\nodejs\\node.exe"
+    );
+    expect(result).toBe(entry);
+    expect(calls).toEqual([{
+      command: "C:\\Program Files\\nodejs\\node.exe",
+      args: [npmCli, "root", "-g"]
+    }]);
   });
 
   test("prefers the npm command shim for Claude and native executables for other providers", () => {
