@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  buildClaudeEnvironment,
   buildProbeInvocation,
   detectCapabilities,
   knownWindowsCliCandidates,
@@ -89,6 +90,23 @@ describe("agent-cli-probe", () => {
       "C:\\Users\\fixture\\AppData\\Roaming\\npm\\node_modules\\@anthropic-ai\\claude-code\\cli.js",
       "C:\\Users\\fixture\\AppData\\Local\\Programs\\claude\\claude.exe"
     ]);
+  });
+
+  test("sets a verified unquoted Git Bash path for native Windows Claude", () => {
+    const result = buildClaudeEnvironment(
+      { CLAUDE_CODE_GIT_BASH_PATH: "\"C:\\Program Files\\Git\\bin\\bash.exe\"", SAFE: "yes" },
+      "win32",
+      (path) => path === "C:\\Program Files\\Git\\bin\\bash.exe"
+    );
+    expect(result).toMatchObject({
+      SAFE: "yes",
+      CLAUDE_CODE_GIT_BASH_PATH: "C:\\Program Files\\Git\\bin\\bash.exe"
+    });
+  });
+
+  test("fails closed when native Windows Claude has no Git Bash", () => {
+    expect(() => buildClaudeEnvironment({}, "win32", () => false))
+      .toThrow(/requires a verified Git Bash/);
   });
 
   test("resolves the installed Claude package from npm's exact global root", async () => {

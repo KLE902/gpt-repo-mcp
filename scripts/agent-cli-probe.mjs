@@ -21,6 +21,9 @@ export async function probeAgentCli(options = {}) {
   const resolveCli = options.resolveCli ?? ((name) => resolveCliCommand(name, runCommand, options.platform ?? globalThis.process.platform));
   const timeoutMs = options.timeoutMs ?? 180_000;
   const maxOutputBytes = options.maxOutputBytes ?? 1_048_576;
+  const commandEnv = provider === "claude"
+    ? buildClaudeEnvironment(globalThis.process.env, options.platform ?? globalThis.process.platform)
+    : globalThis.process.env;
 
   const before = await readGitState(cwd, runCommand);
   if (!before.clean) {
@@ -30,14 +33,14 @@ export async function probeAgentCli(options = {}) {
   }
 
   const cliPath = await resolveCli(CLI_NAMES[provider]);
-  const versionResult = await runCommand(cliPath, ["--version"], { cwd, timeoutMs: 30_000, maxOutputBytes: 65_536 });
+  const versionResult = await runCommand(cliPath, ["--version"], { cwd, env: commandEnv, timeoutMs: 30_000, maxOutputBytes: 65_536 });
   assertCommandSucceeded(versionResult, "CLI_VERSION_FAILED", `${provider} --version failed.`);
 
-  const globalHelp = await runCommand(cliPath, ["--help"], { cwd, timeoutMs: 30_000, maxOutputBytes: 262_144 });
+  const globalHelp = await runCommand(cliPath, ["--help"], { cwd, env: commandEnv, timeoutMs: 30_000, maxOutputBytes: 262_144 });
   assertCommandSucceeded(globalHelp, "CLI_HELP_FAILED", `${provider} --help failed.`);
 
   const providerHelp = provider === "codex"
-    ? await runCommand(cliPath, ["exec", "--help"], { cwd, timeoutMs: 30_000, maxOutputBytes: 262_144 })
+    ? await runCommand(cliPath, ["exec", "--help"], { cwd, env: commandEnv, timeoutMs: 30_000, maxOutputBytes: 262_144 })
     : globalHelp;
   assertCommandSucceeded(providerHelp, "CLI_HELP_FAILED", `${provider} non-interactive help failed.`);
 
@@ -48,6 +51,7 @@ export async function probeAgentCli(options = {}) {
   const probeResult = await runCommand(cliPath, invocation.args, {
     cwd,
     input: prompt,
+    env: commandEnv,
     timeoutMs,
     maxOutputBytes
   });
@@ -247,6 +251,28 @@ async function resolveCliCommand(name, runCommand, platform) {
     });
   }
   return candidate;
+}
+
+export function buildClaudeEnvironment(
+  source = globalThis.process.env,
+  platform = globalThis.process.platform,
+  fileExists = existsSync
+) {
+  const result = { ...source };
+  if (platform !== "win32") return result;
+  const current = String(result.CLAUDE_CODE_GIT_BASH_PATH ?? "").trim().replace(/^"|"$/g, "");
+  const candidates = [
+    current,
+    "C:\\Program Files\\Git\\bin\\bash.exe",
+    "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+    "C:\\Program Files (x86)\\Git\\bin\\bash.exe"
+  ].filter(Boolean);
+  const bashPath = candidates.find((value) => fileExists(value));
+  if (!bashPath) {
+    throw operationError("CLAUDE_GIT_BASH_NOT_FOUND", "Claude Code on native Windows requires a verified Git Bash executable.");
+  }
+  result.CLAUDE_CODE_GIT_BASH_PATH = bashPath;
+  return result;
 }
 
 export async function resolveGlobalNpmClaudeEntry(
