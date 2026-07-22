@@ -16,6 +16,7 @@ if ([string]::IsNullOrWhiteSpace($RepoPath)) {
 }
 
 $supervisorPath = Join-Path $RepoPath "scripts\runtime-supervisor.mjs"
+$launcherPath = Join-Path $RepoPath "scripts\start-runtime-supervisor.ps1"
 $configPath = Join-Path $RepoPath "config.local.json"
 $serverPath = Join-Path $RepoPath "dist\server.js"
 
@@ -72,7 +73,7 @@ if ($Action -eq "Uninstall") {
     exit 0
 }
 
-foreach ($required in @($supervisorPath, $configPath, $serverPath)) {
+foreach ($required in @($supervisorPath, $launcherPath, $configPath, $serverPath)) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
         throw "Required runtime file is missing: $required"
     }
@@ -80,6 +81,7 @@ foreach ($required in @($supervisorPath, $configPath, $serverPath)) {
 
 $nodeCommand = Get-Command node.exe -ErrorAction Stop
 $nodePath = $nodeCommand.Source
+$powershellPath = (Get-Command powershell.exe -ErrorAction Stop).Source
 $npmCli = $env:npm_execpath
 if ([string]::IsNullOrWhiteSpace($npmCli) -or -not (Test-Path -LiteralPath $npmCli -PathType Leaf)) {
     throw "npm_execpath is unavailable. Run this installer through: npm run install:windows-runtime"
@@ -95,11 +97,16 @@ if ($null -ne $existingTask) {
 }
 
 $arguments = @(
-    ('"{0}"' -f $supervisorPath),
-    "--repo", ('"{0}"' -f $RepoPath),
-    "--npm-cli", ('"{0}"' -f $npmCli)
+    "-NoProfile",
+    "-NonInteractive",
+    "-ExecutionPolicy", "Bypass",
+    "-WindowStyle", "Hidden",
+    "-File", ('\"{0}\"' -f $launcherPath),
+    "-RepoPath", ('\"{0}\"' -f $RepoPath),
+    "-NodePath", ('\"{0}\"' -f $nodePath),
+    "-NpmCli", ('\"{0}\"' -f $npmCli)
 ) -join " "
-$taskAction = New-ScheduledTaskAction -Execute $nodePath -Argument $arguments -WorkingDirectory $RepoPath
+$taskAction = New-ScheduledTaskAction -Execute $powershellPath -Argument $arguments -WorkingDirectory $RepoPath
 $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $identity
 $principal = New-ScheduledTaskPrincipal -UserId $identity -LogonType Interactive -RunLevel Limited
@@ -152,6 +159,6 @@ $utf8WithoutBom = [System.Text.UTF8Encoding]::new($false)
 
 Start-ScheduledTask -TaskName $TaskName
 Write-Host "Installed and started $TaskName."
-Write-Host "The supervisor will keep MCP and ngrok running after this interactive launcher is closed."
+Write-Host "The supervisor will keep MCP and ngrok running without an interactive console window."
 Write-Host "The local config now allowlists mcp.runtime.status and mcp.runtime.restart."
 Write-Host "Close the old Start GPT Repo MCP window once, then use npm run runtime:status to verify the supervised runtime."
