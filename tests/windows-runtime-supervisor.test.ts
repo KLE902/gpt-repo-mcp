@@ -11,6 +11,8 @@ describe("Windows runtime supervisor installation", () => {
     expect(installer).toContain("-WindowStyle");
     expect(installer).toContain("Hidden");
     expect(installer).toContain("New-ScheduledTaskAction -Execute $powershellPath");
+    expect(installer).toContain(`('"{0}"' -f $launcherPath)`);
+    expect(installer).not.toContain("\\\"{0}\\\"");
     expect(launcher).toContain("runtime-supervisor.mjs");
     expect(launcher).toContain("& $NodePath @arguments");
     expect(launcher).not.toContain("Invoke-Expression");
