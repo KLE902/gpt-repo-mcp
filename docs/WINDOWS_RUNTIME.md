@@ -148,3 +148,9 @@ If `npm run runtime:status` reports a stale or missing supervisor:
 5. reinstall with `npm run install:windows-runtime` when the repository path or Node installation changed
 
 Use `npm run connect` as the fallback diagnostic path. It remains independent of the scheduled-task installation.
+
+## Console window behavior
+
+The scheduled task starts the supervisor through a fixed PowerShell launcher with `-WindowStyle Hidden`. No persistent console window should remain open during normal supervised operation. Reinstall the current runtime build if an older task still starts `node.exe` interactively.
+
+`npm run runtime:status` reports the most recent MCP or tunnel exit when one exists. A restart counter that remains unchanged while the process is healthy is historical and does not by itself indicate an active restart loop.
