@@ -257,6 +257,14 @@ Creates or updates the open GitHub pull request for the exact pushed branch. It 
 
 Closes one exact open, unmerged pull request only after explicit owner approval and exact local/PR head-SHA validation. It blocks base-branch heads, the currently checked-out head, mismatching local or origin refs, and any branch used by another open PR. GitHub closure uses fixed `gh pr close` arguments without `--delete-branch`; closure is re-read and verified before separate best-effort local and origin branch deletion through fixed Git operations. Cleanup failures are reported as warnings without misreporting the verified PR closure.
 
+### `repo_branch_audit`
+
+Audits one exact local and/or `origin` branch without changing refs. It resolves the current remote base SHA, local and remote branch SHAs, merge base, ahead/behind counts, full ancestry into the base, and open GitHub pull requests using the branch. The result reports `safe_to_retire` only when the worktree is clean, the branch is not current or protected, local and remote refs agree, the branch is fully contained in the base, and no open PR uses it.
+
+### `repo_write_retire_branch`
+
+Retires one exact standalone branch after explicit owner approval. It requires the exact repository HEAD, branch SHA, and remote base SHA returned by a fresh audit. Immediately before deletion it rechecks ancestry, local and remote refs, and open PR use. It can delete only the verified local ref and optional matching `origin` ref; it refuses `main`, `master`, the selected base, the current branch, divergent refs, and any branch with commits not contained in the base.
+
 ### `repo_write_finalize_pull_request`
 
 After GitHub confirms a merge and the owner approves cleanup, verifies the exact PR head, local and remote feature refs, synchronizes the base, switches to it, and deletes only the verified feature branch locally and optionally on `origin`.

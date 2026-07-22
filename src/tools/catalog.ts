@@ -12,6 +12,8 @@ import {
   gitReviewHandler,
   writeCreateBranchHandler,
   gitBranchesHandler,
+  branchAuditHandler,
+  writeRetireBranchHandler,
   writeSwitchBranchHandler,
   remoteStatusHandler,
   remotePullRequestsHandler,
@@ -475,5 +477,23 @@ export const toolCatalog: ToolDefinition[] = [
     outputSchema: toolContracts.repo_write_handoff.output,
     annotations: writeAnnotations,
     handler: writeHandoffHandler
+  },
+  {
+    name: "repo_branch_audit",
+    title: "Audit branch retirement",
+    description: descriptions.repo_branch_audit,
+    inputSchema: toolContracts.repo_branch_audit.input,
+    outputSchema: toolContracts.repo_branch_audit.output,
+    annotations: remoteReadAnnotations,
+    handler: branchAuditHandler
+  },
+  {
+    name: "repo_write_retire_branch",
+    title: "Retire verified branch",
+    description: descriptions.repo_write_retire_branch,
+    inputSchema: toolContracts.repo_write_retire_branch.input,
+    outputSchema: toolContracts.repo_write_retire_branch.output,
+    annotations: remoteWriteAnnotations,
+    handler: writeRetireBranchHandler
   }
 ];

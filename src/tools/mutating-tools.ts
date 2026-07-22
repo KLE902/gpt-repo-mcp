@@ -3,6 +3,7 @@ import type { ToolName } from "./contracts.js";
 export const MUTATING_TOOL_NAMES = [
   "repo_write_create_branch",
   "repo_write_switch_branch",
+  "repo_write_retire_branch",
   "repo_write_file",
   "repo_write_changes",
   "repo_write_handoff",

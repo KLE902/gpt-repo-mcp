@@ -28,17 +28,47 @@ describe("TaskInventoryService", () => {
 
     expect(result.tasks).toEqual(expect.arrayContaining([
       expect.objectContaining({ path: "TODO.md", line: 2, kind: "checkbox", text: "Add onboarding flow" }),
-      expect.objectContaining({ path: "TODO.md", line: 3, kind: "checkbox", text: "Keep completed task visible" }),
       expect.objectContaining({ path: "TODO.md", line: 4, kind: "roadmap" }),
       expect.objectContaining({ path: "src/tasks.ts", line: 2, kind: "todo" }),
       expect.objectContaining({ path: "src/tasks.ts", line: 3, kind: "fixme" }),
       expect.objectContaining({ path: "src/tasks.ts", line: 4, kind: "hack" })
     ]));
-    expect(result.matched_count).toBe(6);
-    expect(result.returned_count).toBe(6);
+    expect(result.matched_count).toBe(5);
+    expect(result.returned_count).toBe(5);
     expect(result.scanned_file_count).toBeGreaterThanOrEqual(2);
     expect(result.scan_complete).toBe(true);
     expect(result.truncated).toBe(false);
+  });
+
+  test("ignores scanner-like prose, completed checkboxes, and stale local handoffs by default", async () => {
+    const fixture = await createRepoFixture();
+    await mkdir(join(fixture.root, ".chatgpt", "handoffs"), { recursive: true });
+    await writeFile(join(fixture.root, ".chatgpt", "handoffs", "current.local.md"), "## Next Steps\n- [ ] Resume obsolete work\n");
+    await writeFile(join(fixture.root, "src", "noise.ts"), [
+      "const labels = ['TODO', 'FIXME', 'HACK'];",
+      "const roadmapPattern = /NEXT STEPS/;",
+      ""
+    ].join("\n"));
+    await writeFile(join(fixture.root, "docs", "noise.md"), [
+      "The next step is explained in ordinary prose.",
+      "- [x] Already completed",
+      ""
+    ].join("\n"));
+
+    const service = new TaskInventoryService(fixture.root, new PathSandbox(fixture.root));
+    const defaultResult = await service.inventory();
+
+    expect(defaultResult.tasks.map((task) => task.path)).not.toContain(".chatgpt/handoffs/current.local.md");
+    expect(defaultResult.tasks.map((task) => task.path)).not.toContain("src/noise.ts");
+    expect(defaultResult.tasks.map((task) => task.path)).not.toContain("docs/noise.md");
+
+    const explicitHandoffResult = await service.inventory({
+      include_globs: [".chatgpt/handoffs/**"],
+      labels: ["roadmap"]
+    });
+    expect(explicitHandoffResult.tasks).toEqual([
+      expect.objectContaining({ path: ".chatgpt/handoffs/current.local.md", kind: "roadmap" })
+    ]);
   });
 
   test("supports labels, globs, and pagination", async () => {
