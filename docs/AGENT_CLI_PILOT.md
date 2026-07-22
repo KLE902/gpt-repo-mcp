@@ -31,9 +31,9 @@ Only the environment variables required for the selected local authentication me
 
 ## One-time Claude authentication
 
-The read-only Claude capability probe fails closed when the terminal CLI has no credentials. `scripts/start-claude-login.ps1` is the bounded one-time recovery path on Windows. It opens a visible PowerShell child, runs the official `claude auth login` flow, waits for browser authorization, verifies `claude auth status`, and returns only the marker `CLAUDE_AUTH_LOGIN_OK` to the MCP caller.
+The read-only Claude capability probe fails closed when the terminal CLI has no credentials. `scripts/start-claude-login.ps1` is the bounded one-time recovery path on Windows. It opens a visible PowerShell child, runs the official `claude auth login` flow, and returns only the marker `CLAUDE_AUTH_LOGIN_STARTED` to the MCP caller. The child verifies `claude auth status` before it closes; ChatGPT independently reruns the read-only capability probe after the owner completes browser authorization.
 
-The launcher never reads, prints, stores, or returns an OAuth token or API key. Account authorization remains a direct owner-to-Anthropic action; it is not prompt or command relaying between ChatGPT and an agent.
+The launcher does not keep the MCP request open while the owner interacts with Anthropic, because connector timeouts are shorter than an OAuth login. It never reads, prints, stores, or returns an OAuth token or API key. Account authorization remains a direct owner-to-Anthropic action; it is not prompt or command relaying between ChatGPT and an agent.
 
 ## Non-goals before PKR-003
 

@@ -89,15 +89,10 @@ $ChildArguments = @(
     "-File", $ScriptPath,
     "-InteractiveChild"
 )
-$Child = Start-Process -FilePath "powershell.exe" `
+[void](Start-Process -FilePath "powershell.exe" `
     -ArgumentList $ChildArguments `
     -WorkingDirectory $env:USERPROFILE `
     -WindowStyle Normal `
-    -PassThru `
-    -Wait
+    -PassThru)
 
-if ($Child.ExitCode -ne 0) {
-    throw "The visible Claude Code login process did not complete successfully."
-}
-
-Write-Output "CLAUDE_AUTH_LOGIN_OK"
+Write-Output "CLAUDE_AUTH_LOGIN_STARTED"
