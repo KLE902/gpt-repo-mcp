@@ -228,6 +228,16 @@ describe("agent-cli-probe", () => {
     expect(runner.calls).toHaveLength(2);
   });
 
+  test("verifies hidden documented Claude flags through execution rather than help text", () => {
+    const capabilities = detectCapabilities(
+      "claude",
+      "-p --output-format --permission-mode --disallowedTools"
+    );
+    expect(capabilities.max_turns).toBe(false);
+    expect(() => buildProbeInvocation("claude", capabilities, "/repo")).not.toThrow();
+    expect(buildProbeInvocation("claude", capabilities, "/repo").args).toContain("--max-turns");
+  });
+
   test("fails closed when required local CLI capabilities are absent", () => {
     const capabilities = detectCapabilities("claude", "-p --output-format --max-turns");
     expect(() => buildProbeInvocation("claude", capabilities, "/repo"))

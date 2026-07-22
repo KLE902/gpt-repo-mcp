@@ -57,6 +57,7 @@ export async function probeAgentCli(options = {}) {
   });
   assertCommandSucceeded(probeResult, "CLI_PROBE_FAILED", `${provider} non-interactive probe failed.`);
   validateProbeOutput(provider, probeResult.stdout, marker);
+  if (provider === "claude") capabilities.max_turns = true;
 
   const after = await readGitState(cwd, runCommand);
   if (after.head !== before.head) {
@@ -142,7 +143,7 @@ export function buildProbeInvocation(provider, capabilities, cwd) {
   }
 
   if (provider === "claude") {
-    requireCapabilities(provider, capabilities, ["print", "output_format", "max_turns", "permission_mode", "disallowed_tools"]);
+    requireCapabilities(provider, capabilities, ["print", "output_format", "permission_mode", "disallowed_tools"]);
     const args = [
       "-p",
       "--output-format", "json",
