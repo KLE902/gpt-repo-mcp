@@ -98,6 +98,29 @@ describe("package startup scripts", () => {
       .resolves.toBeDefined();
   });
 
+  test("includes a bounded visible Claude login launcher", async () => {
+    const launcherPath = join(process.cwd(), "scripts", "start-claude-login.ps1");
+    await expect(access(launcherPath)).resolves.toBeUndefined();
+    const launcher = await readFile(launcherPath, "utf8");
+    expect(launcher).toContain("Start-Process");
+    expect(launcher).toContain("auth login");
+    expect(launcher).toContain("auth status --text");
+    expect(launcher).toContain("CLAUDE_AUTH_LOGIN_OK");
+    expect(launcher).not.toContain("CLAUDE_CODE_OAUTH_TOKEN");
+    expect(launcher).not.toContain("ANTHROPIC_API_KEY");
+
+    if (process.platform !== "win32") return;
+    const escapedPath = launcherPath.replaceAll("'", "''");
+    const command = [
+      "$lexemes = $null",
+      "$parseIssues = $null",
+      `[System.Management.Automation.Language.Parser]::ParseFile('${escapedPath}', [ref]$lexemes, [ref]$parseIssues) | Out-Null`,
+      "if ($parseIssues.Count -gt 0) { $parseIssues | ForEach-Object { Write-Error $_ }; exit 1 }"
+    ].join("; ");
+    await expect(run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", command], process.cwd()))
+      .resolves.toBeDefined();
+  });
+
   test("includes secure tunnel startup script and env example", async () => {
     const scriptPath = join(process.cwd(), "scripts", "connect-secure.mjs");
     await expect(access(scriptPath)).resolves.toBeUndefined();

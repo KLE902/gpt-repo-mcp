@@ -29,6 +29,12 @@ Each entry runs the same probe script with a fixed provider argument. The config
 
 Only the environment variables required for the selected local authentication method should be inherited. Stored CLI login state normally uses the existing user-profile environment. API-key authentication, when intentionally used, may additionally inherit `OPENAI_API_KEY` for Codex or `ANTHROPIC_API_KEY` for Claude.
 
+## One-time Claude authentication
+
+The read-only Claude capability probe fails closed when the terminal CLI has no credentials. `scripts/start-claude-login.ps1` is the bounded one-time recovery path on Windows. It opens a visible PowerShell child, runs the official `claude auth login` flow, waits for browser authorization, verifies `claude auth status`, and returns only the marker `CLAUDE_AUTH_LOGIN_OK` to the MCP caller.
+
+The launcher never reads, prints, stores, or returns an OAuth token or API key. Account authorization remains a direct owner-to-Anthropic action; it is not prompt or command relaying between ChatGPT and an agent.
+
 ## Non-goals before PKR-003
 
 The first pilot does not introduce:
