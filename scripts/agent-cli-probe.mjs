@@ -297,18 +297,33 @@ export async function resolveGlobalNpmClaudeEntry(
   if (result?.exitCode !== 0 || result?.timedOut || result?.truncated || result?.complete === false) return null;
   const root = String(result.stdout ?? "").trim();
   if (!root || /[\r\n]/.test(root)) return null;
-  const entry = join(root, "@anthropic-ai", "claude-code", "cli.js");
-  return fileExists(entry) ? entry : null;
+  const entries = claudeNpmEntryCandidates(root, globalThis.process.arch);
+  return entries.find((entry) => fileExists(entry)) ?? null;
+}
+
+export function claudeNpmEntryCandidates(root, architecture = globalThis.process.arch) {
+  const arch = architecture === "arm64" ? "arm64" : "x64";
+  const nativePackage = `claude-code-win32-${arch}`;
+  return [
+    join(root, "@anthropic-ai", nativePackage, "claude.exe"),
+    join(root, "@anthropic-ai", "claude-code", "node_modules", "@anthropic-ai", nativePackage, "claude.exe"),
+    join(root, "@anthropic-ai", "claude-code", "claude.exe"),
+    join(root, "@anthropic-ai", "claude-code", "cli.js")
+  ];
 }
 
 export function selectCliCandidate(name, candidates) {
+  const nativePackageBinary = candidates.find((value) =>
+    value.toLowerCase().includes(`${join("@anthropic-ai", "claude-code-win32-").toLowerCase()}`) &&
+    value.toLowerCase().endsWith("claude.exe")
+  );
   const packageEntry = candidates.find((value) =>
     value.toLowerCase().endsWith(join("@anthropic-ai", "claude-code", "cli.js").toLowerCase())
   );
   const commandShim = candidates.find((value) => /\.(cmd|bat)$/i.test(value));
   const executable = candidates.find((value) => value.toLowerCase().endsWith(".exe"));
   return name === "claude"
-    ? packageEntry ?? commandShim ?? executable ?? candidates[0]
+    ? nativePackageBinary ?? packageEntry ?? commandShim ?? executable ?? candidates[0]
     : executable ?? commandShim ?? candidates[0];
 }
 

@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   buildClaudeEnvironment,
   buildProbeInvocation,
+  claudeNpmEntryCandidates,
   detectCapabilities,
   knownWindowsCliCandidates,
   probeAgentCli,
@@ -109,10 +110,19 @@ describe("agent-cli-probe", () => {
       .toThrow(/requires a verified Git Bash/);
   });
 
+  test("prefers the npm platform binary before the JavaScript wrapper", () => {
+    expect(claudeNpmEntryCandidates("D:\\npm-global\\node_modules", "x64")).toEqual([
+      "D:\\npm-global\\node_modules\\@anthropic-ai\\claude-code-win32-x64\\claude.exe",
+      "D:\\npm-global\\node_modules\\@anthropic-ai\\claude-code\\node_modules\\@anthropic-ai\\claude-code-win32-x64\\claude.exe",
+      "D:\\npm-global\\node_modules\\@anthropic-ai\\claude-code\\claude.exe",
+      "D:\\npm-global\\node_modules\\@anthropic-ai\\claude-code\\cli.js"
+    ]);
+  });
+
   test("resolves the installed Claude package from npm's exact global root", async () => {
     const npmCli = "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js";
     const globalRoot = "D:\\npm-global\\node_modules";
-    const entry = `${globalRoot}\\@anthropic-ai\\claude-code\\cli.js`;
+    const entry = `${globalRoot}\\@anthropic-ai\\claude-code-win32-x64\\claude.exe`;
     const calls = [];
     const result = await resolveGlobalNpmClaudeEntry(
       async (command, args) => {
