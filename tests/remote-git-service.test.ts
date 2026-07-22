@@ -647,6 +647,176 @@ describe("RemoteGitService", () => {
   });
 });
 
+describe("pull request listing and retirement", () => {
+  const CURRENT = "9".repeat(40);
+
+  test("lists bounded pull requests through GitHub CLI and maps source state", async () => {
+    const ghCalls: string[][] = [];
+    const service = new RemoteGitService("/repo", new OperationsPolicy(), {
+      git_runner: async (args) => {
+        if (args.join(" ") === "remote get-url origin") return "https://github.com/acme/demo.git";
+        if (args.join(" ") === "check-ref-format --branch feature/demo") return "feature/demo";
+        throw new Error(`Unexpected git call: ${args.join(" ")}`);
+      },
+      gh_runner: async (args) => {
+        ghCalls.push(args);
+        return JSON.stringify([ghPullFixture()]);
+      }
+    });
+
+    const output = await service.pullRequests({
+      repo_id: "fixture",
+      remote: "origin",
+      state: "all",
+      head: "feature/demo",
+      limit: 1,
+      include_checks: false
+    });
+
+    expect(output).toMatchObject({
+      state: "all",
+      head: "feature/demo",
+      truncated: false,
+      pull_requests: [{
+        number: 7,
+        state: "open",
+        head_ref: "feature/demo",
+        head_sha: HEAD,
+        base_ref: "main",
+        mergeable: true,
+        mergeable_state: "clean",
+        merged: false
+      }]
+    });
+    expect(ghCalls[0]).toContain("2");
+  });
+
+  test("closes an exact superseded PR then deletes only matching local and remote head refs", async () => {
+    let localFeature = true;
+    let remoteFeature = true;
+    let closed = false;
+    const gitCalls: string[][] = [];
+    const ghCalls: string[][] = [];
+    const service = new RemoteGitService("/repo", new OperationsPolicy({
+      enabled: true,
+      github_pull_request_enabled: true,
+      git_branch_manage_enabled: true,
+      git_push_enabled: true
+    }), {
+      git_runner: async (args) => {
+        gitCalls.push(args);
+        const command = args.join(" ");
+        if (command === "rev-parse HEAD") return CURRENT;
+        if (command === "symbolic-ref --quiet --short HEAD") return "main";
+        if (command === "status --porcelain=v1 --untracked-files=all") return "";
+        if (command === "remote get-url origin") return "https://github.com/acme/demo.git";
+        if (command === "check-ref-format --branch feature/demo") return "feature/demo";
+        if (command === "check-ref-format --branch main") return "main";
+        if (command === "rev-parse refs/heads/feature/demo") {
+          if (!localFeature) throw new Error("missing local branch");
+          return HEAD;
+        }
+        if (command === "ls-remote --heads origin refs/heads/feature/demo") return remoteFeature ? `${HEAD}\trefs/heads/feature/demo` : "";
+        if (command === "branch -D feature/demo") { localFeature = false; return ""; }
+        if (command === "push --porcelain origin :refs/heads/feature/demo") { remoteFeature = false; return ""; }
+        throw new Error(`Unexpected git call: ${command}`);
+      },
+      gh_runner: async (args) => {
+        ghCalls.push(args);
+        const command = args.join(" ");
+        if (command.startsWith("pr view 7 ")) return JSON.stringify(ghPullFixture({ state: closed ? "CLOSED" : "OPEN" }));
+        if (command.startsWith("pr list ")) return JSON.stringify(closed ? [] : [ghPullFixture()]);
+        if (command === "pr close 7 --repo acme/demo --comment Superseded by #6.") { closed = true; return ""; }
+        throw new Error(`Unexpected gh call: ${command}`);
+      }
+    });
+
+    const output = await service.retirePullRequest({
+      repo_id: "fixture",
+      remote: "origin",
+      pull_number: 7,
+      expected_head_sha: CURRENT,
+      expected_pull_head_sha: HEAD,
+      owner_approved: true,
+      comment: "Superseded by #6.",
+      delete_local_branch: true,
+      delete_remote_branch: true,
+      dry_run: false
+    });
+
+    expect(output).toMatchObject({
+      closed: true,
+      comment_added: true,
+      local_branch_deleted: true,
+      remote_branch_deleted: true,
+      pull_request: { state: "closed", merged: false, head_sha: HEAD }
+    });
+    expect(ghCalls).toContainEqual(["pr", "close", "7", "--repo", "acme/demo", "--comment", "Superseded by #6."]);
+    expect(gitCalls).toContainEqual(["branch", "-D", "feature/demo"]);
+    expect(gitCalls).toContainEqual(["push", "--porcelain", "origin", ":refs/heads/feature/demo"]);
+  });
+
+  test("blocks retirement when another open PR uses the same head branch", async () => {
+    let closeCalled = false;
+    const service = new RemoteGitService("/repo", new OperationsPolicy({
+      enabled: true,
+      github_pull_request_enabled: true,
+      git_branch_manage_enabled: true,
+      git_push_enabled: true
+    }), {
+      git_runner: async (args) => {
+        const command = args.join(" ");
+        if (command === "rev-parse HEAD") return CURRENT;
+        if (command === "symbolic-ref --quiet --short HEAD") return "main";
+        if (command === "status --porcelain=v1 --untracked-files=all") return "";
+        if (command === "remote get-url origin") return "https://github.com/acme/demo.git";
+        if (command === "check-ref-format --branch feature/demo") return "feature/demo";
+        if (command === "check-ref-format --branch main") return "main";
+        throw new Error(`Unexpected git call: ${command}`);
+      },
+      gh_runner: async (args) => {
+        const command = args.join(" ");
+        if (command.startsWith("pr view 7 ")) return JSON.stringify(ghPullFixture());
+        if (command.startsWith("pr list ")) return JSON.stringify([ghPullFixture(), ghPullFixture({ number: 8 })]);
+        if (command.startsWith("pr close ")) closeCalled = true;
+        return "";
+      }
+    });
+
+    await expect(service.retirePullRequest({
+      repo_id: "fixture",
+      remote: "origin",
+      pull_number: 7,
+      expected_head_sha: CURRENT,
+      expected_pull_head_sha: HEAD,
+      owner_approved: true,
+      delete_local_branch: true,
+      delete_remote_branch: true,
+      dry_run: false
+    })).rejects.toMatchObject({ code: "GITHUB_PR_BRANCH_IN_USE" });
+    expect(closeCalled).toBe(false);
+  });
+});
+
+function ghPullFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    number: 7,
+    title: "Fixture PR",
+    state: "OPEN",
+    isDraft: false,
+    url: "https://github.com/acme/demo/pull/7",
+    headRefName: "feature/demo",
+    headRefOid: HEAD,
+    baseRefName: "main",
+    baseRefOid: "2".repeat(40),
+    mergeable: "MERGEABLE",
+    mergeStateStatus: "CLEAN",
+    mergedAt: null,
+    body: null,
+    ...overrides
+  };
+}
+
 function pullFixture(options: { title?: string; base?: string; baseSha?: string; headSha?: string; state?: "open" | "closed"; draft?: boolean; merged?: boolean } = {}) {
   return {
     number: 7,

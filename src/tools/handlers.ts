@@ -41,6 +41,7 @@ import type { CodexReviewInput, CodexTaskInput, CodexTaskWriteInput } from "../c
 import type { NextActionInput } from "../contracts/next-action.contract.js";
 import type { LastWriteInput } from "../contracts/operation-receipt.contract.js";
 import type { PolicyExplainInput } from "../contracts/policy.contract.js";
+import type { PullRequestListInput, RetirePullRequestInput } from "../contracts/pull-retirement.contract.js";
 import type { WriteChangesInput, WriteFileInput } from "../contracts/write.contract.js";
 import type { GitCommitInput, GitRecoverInput, GitRestorePathsInput, GitStageCommitInput, GitStageInput, GitUnstageInput } from "../contracts/git-operations.contract.js";
 import type { GitReviewInput } from "../contracts/git-review.contract.js";
@@ -169,10 +170,18 @@ export const writeSwitchBranchHandler: ToolHandler = async (input, context) => s
 });
 
 export const remoteStatusHandler: ToolHandler = async (input, context) => safeTool<RemoteStatusInput>("repo_remote_status", input, context, async (args) => {
+
   const repo = context.registry.get(args.repo_id);
   const result = await new RemoteGitService(repo.root, new OperationsPolicy(repo.operations)).status(args);
   audit({ tool: "repo_remote_status", repo_id: args.repo_id, counts: { checks: result.checks?.total ?? 0 }, warnings: result.warnings });
   return createSuccessEnvelope(result, result.pull_request ? `Remote branch and pull request #${result.pull_request.number} inspected.` : "Remote branch inspected; no matching pull request was returned.", { warnings: result.warnings });
+});
+
+export const remotePullRequestsHandler: ToolHandler = async (input, context) => safeTool<PullRequestListInput>("repo_remote_pull_requests", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await new RemoteGitService(repo.root, new OperationsPolicy(repo.operations)).pullRequests(args);
+  audit({ tool: "repo_remote_pull_requests", repo_id: args.repo_id, counts: { pull_requests: result.pull_requests.length }, truncated: result.truncated, warnings: result.warnings });
+  return createSuccessEnvelope(result, `Returned ${result.pull_requests.length} pull requests.`, { warnings: result.warnings });
 });
 
 export const writePushHandler: ToolHandler = async (input, context) => safeTool<PushInput>("repo_write_push", input, context, async (args) => {
@@ -187,6 +196,13 @@ export const writePullRequestHandler: ToolHandler = async (input, context) => sa
   const result = await new RemoteGitService(repo.root, new OperationsPolicy(repo.operations)).pullRequest(args);
   audit({ tool: "repo_write_pull_request", repo_id: args.repo_id, warnings: result.warnings });
   return createSuccessEnvelope(result, result.pull_request ? `${result.action} pull request #${result.pull_request.number}.` : `${result.action} pull request for ${result.branch}.`, { warnings: result.warnings });
+});
+
+export const writeRetirePullRequestHandler: ToolHandler = async (input, context) => safeTool<RetirePullRequestInput>("repo_write_retire_pull_request", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await new RemoteGitService(repo.root, new OperationsPolicy(repo.operations)).retirePullRequest(args);
+  audit({ tool: "repo_write_retire_pull_request", repo_id: args.repo_id, warnings: result.warnings });
+  return createSuccessEnvelope(result, result.dry_run ? `Dry run validated retirement of pull request #${result.pull_request.number}.` : `Retired pull request #${result.pull_request.number}.`, { warnings: result.warnings });
 });
 
 export const writeFinalizePullRequestHandler: ToolHandler = async (input, context) => safeTool<FinalizePullRequestInput>("repo_write_finalize_pull_request", input, context, async (args) => {

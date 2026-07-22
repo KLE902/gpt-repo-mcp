@@ -13,7 +13,7 @@ flows. Use `repo_write_stage`, `repo_write_unstage`, `repo_git_restore_paths`,
 `repo_git_stage`, `repo_git_unstage`, and `repo_git_commit` remain available as
 compatibility aliases with the same contracts and safety checks.
 
-For reviewed delivery that begins on a base branch, use `repo_write_create_branch`, review and commit, then `repo_write_push`, `repo_write_pull_request`, and `repo_remote_status`. Use the installed GitHub integration or GitHub CLI for draft-ready and close operations. Merge only after explicit owner approval with `repo_write_merge_pull_request`, then use `repo_write_finalize_pull_request` for verified base synchronization, switch, and branch cleanup. `repo_git_branches` and `repo_write_switch_branch` support guarded local branch handling. `repo_run_allowed_script` accepts only configured script ids; `repo_write_dispatch_workflow` starts only locally allowlisted GitHub Actions workflows after exact remote ref-SHA validation.
+For reviewed delivery that begins on a base branch, use `repo_write_create_branch`, review and commit, then `repo_write_push`, `repo_write_pull_request`, and `repo_remote_status`. Use `repo_remote_pull_requests` for bounded repository-wide PR audits. Draft-ready uses the fixed `github.pr-ready` GitHub CLI wrapper. Close an abandoned or superseded open PR only after explicit owner approval with `repo_write_retire_pull_request`; it verifies the exact PR head and separately guards branch cleanup. Merge only after explicit owner approval with `repo_write_merge_pull_request`, then use `repo_write_finalize_pull_request` for verified base synchronization, switch, and branch cleanup. `repo_git_branches` and `repo_write_switch_branch` support guarded local branch handling. `repo_run_allowed_script` accepts only configured script ids; `repo_write_dispatch_workflow` starts only locally allowlisted GitHub Actions workflows after exact remote ref-SHA validation.
 
 
 
@@ -241,6 +241,10 @@ Switches a clean worktree to an existing local branch after exact current branch
 
 Reads the configured `origin`, current branch/HEAD/clean state, upstream divergence, matching GitHub pull request, and normalized checks. It is read-only but has `openWorldHint: true` because it accesses GitHub and the Git remote.
 
+### `repo_remote_pull_requests`
+
+Lists a bounded set of open, closed, or all pull requests with optional exact head/base filters. The tool builds fixed `gh pr list` arguments, requests structured JSON, validates every returned PR, and optionally adds normalized checks through the existing GitHub API client. The caller cannot supply GitHub CLI commands or flags.
+
 ### `repo_write_push`
 
 Pushes the exact reviewed clean feature branch and HEAD to `origin` with a fixed non-force refspec. It rejects detached HEAD, stale HEAD, branch mismatch, dirty state, non-GitHub remotes, remotes other than `origin`, and direct push to `main` or `master`.
@@ -248,6 +252,10 @@ Pushes the exact reviewed clean feature branch and HEAD to `origin` with a fixed
 ### `repo_write_pull_request`
 
 Creates or updates the open GitHub pull request for the exact pushed branch. It requires the remote branch SHA to match local HEAD. Title, optional body, base, and draft-on-create are typed inputs; an existing draft state is not silently changed.
+
+### `repo_write_retire_pull_request`
+
+Closes one exact open, unmerged pull request only after explicit owner approval and exact local/PR head-SHA validation. It blocks base-branch heads, the currently checked-out head, mismatching local or origin refs, and any branch used by another open PR. GitHub closure uses fixed `gh pr close` arguments without `--delete-branch`; closure is re-read and verified before separate best-effort local and origin branch deletion through fixed Git operations. Cleanup failures are reported as warnings without misreporting the verified PR closure.
 
 ### `repo_write_finalize_pull_request`
 

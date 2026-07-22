@@ -12,6 +12,7 @@ import { HandoffInputSchema, HandoffResultSchema } from "../contracts/handoff.co
 import { NextActionInputSchema, NextActionResultSchema } from "../contracts/next-action.contract.js";
 import { LastWriteInputSchema, LastWriteResultSchema } from "../contracts/operation-receipt.contract.js";
 import { PolicyExplainInputSchema, PolicyExplainResultSchema } from "../contracts/policy.contract.js";
+import { PullRequestListInputSchema, PullRequestListResultSchema, RetirePullRequestInputSchema, RetirePullRequestResultSchema } from "../contracts/pull-retirement.contract.js";
 import { ProjectBriefInputSchema, ProjectBriefResultSchema } from "../contracts/project.contract.js";
 import { CreateBranchInputSchema, CreateBranchResultSchema, MergePullRequestInputSchema, MergePullRequestResultSchema, PullRequestInputSchema, PullRequestResultSchema, PushInputSchema, PushResultSchema, RemoteStatusInputSchema, RemoteStatusResultSchema, SyncBaseInputSchema, SyncBaseResultSchema } from "../contracts/remote-git.contract.js";
 import { RepoInputSchema, RepoListResultSchema, RepoTreeInputSchema } from "../contracts/repo.contract.js";
@@ -36,8 +37,10 @@ export type ToolName =
   | "repo_git_branches"
   | "repo_write_switch_branch"
   | "repo_remote_status"
+  | "repo_remote_pull_requests"
   | "repo_write_push"
   | "repo_write_pull_request"
+  | "repo_write_retire_pull_request"
   | "repo_write_finalize_pull_request"
   | "repo_write_dispatch_workflow"
   | "repo_run_allowed_script"
@@ -128,6 +131,10 @@ export const toolContracts = {
     input: RemoteStatusInputSchema,
     output: RemoteStatusResultSchema
   },
+  repo_remote_pull_requests: {
+    input: PullRequestListInputSchema,
+    output: PullRequestListResultSchema
+  },
   repo_write_push: {
     input: PushInputSchema,
     output: PushResultSchema
@@ -135,6 +142,10 @@ export const toolContracts = {
   repo_write_pull_request: {
     input: PullRequestInputSchema,
     output: PullRequestResultSchema
+  },
+  repo_write_retire_pull_request: {
+    input: RetirePullRequestInputSchema,
+    output: RetirePullRequestResultSchema
   },
   repo_write_finalize_pull_request: {
     input: FinalizePullRequestInputSchema,

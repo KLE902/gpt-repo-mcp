@@ -28,6 +28,7 @@ import { GitReviewResultSchema } from "../src/contracts/git-review.contract.js";
 import { HandoffInputSchema, HandoffResultSchema } from "../src/contracts/handoff.contract.js";
 import { LastWriteInputSchema, LastWriteResultSchema } from "../src/contracts/operation-receipt.contract.js";
 import { PolicyExplainInputSchema, PolicyExplainResultSchema } from "../src/contracts/policy.contract.js";
+import { PullRequestListInputSchema, PullRequestListResultSchema, RetirePullRequestInputSchema, RetirePullRequestResultSchema } from "../src/contracts/pull-retirement.contract.js";
 import { CreateBranchInputSchema, CreateBranchResultSchema, MergePullRequestInputSchema, MergePullRequestResultSchema, PullRequestInputSchema, PullRequestResultSchema, PushInputSchema, PushResultSchema, RemoteStatusInputSchema, RemoteStatusResultSchema, SyncBaseInputSchema, SyncBaseResultSchema } from "../src/contracts/remote-git.contract.js";
 import { RepoReaderConfigSchema } from "../src/config/schema.js";
 import { readOnlyAnnotations, remoteReadAnnotations, remoteWriteAnnotations, writeAnnotations } from "../src/tools/annotations.js";
@@ -62,8 +63,10 @@ describe("tool catalog contracts", () => {
       "repo_git_review",
       "repo_write_create_branch",
       "repo_remote_status",
+      "repo_remote_pull_requests",
       "repo_write_push",
       "repo_write_pull_request",
+      "repo_write_retire_pull_request",
       "repo_write_sync_base",
       "repo_write_merge_pull_request",
       "repo_git_stage",
@@ -95,9 +98,9 @@ describe("tool catalog contracts", () => {
       expect(tool.description.startsWith("Use this when")).toBe(true);
       expect(tool.inputSchema).toBeDefined();
       expect(tool.outputSchema).toBeDefined();
-      if (["repo_remote_status", "repo_git_branches"].includes(tool.name)) {
+      if (["repo_remote_status", "repo_remote_pull_requests", "repo_git_branches"].includes(tool.name)) {
         expect(tool.annotations).toEqual(remoteReadAnnotations);
-      } else if (["repo_write_push", "repo_write_pull_request", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name)) {
+      } else if (["repo_write_push", "repo_write_pull_request", "repo_write_retire_pull_request", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name)) {
         expect(tool.annotations).toEqual(remoteWriteAnnotations);
       } else if (isMutatingToolName(tool.name)) {
         expect(tool.annotations).toEqual(writeAnnotations);
@@ -127,6 +130,7 @@ describe("tool catalog contracts", () => {
       "repo_cleanup_paths",
       "repo_write_push",
       "repo_write_pull_request",
+      "repo_write_retire_pull_request",
       "repo_write_sync_base",
       "repo_write_merge_pull_request"
     ]);
@@ -741,7 +745,7 @@ describe("tool catalog contracts", () => {
 
   test("delivery tool surface stays exact with local branch creation and open-world remote operations", () => {
     const remoteTools = toolCatalog
-      .filter((tool) => ["repo_write_create_branch", "repo_remote_status", "repo_write_push", "repo_write_pull_request", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name))
+      .filter((tool) => ["repo_write_create_branch", "repo_remote_status", "repo_remote_pull_requests", "repo_write_push", "repo_write_pull_request", "repo_write_retire_pull_request", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name))
       .map((tool) => ({
         name: tool.name,
         annotations: tool.annotations,
@@ -763,6 +767,12 @@ describe("tool catalog contracts", () => {
         outputKeys: ["ahead", "behind", "branch", "checks", "clean", "head_sha", "ok", "pull_request", "pushed", "remote", "remote_head_sha", "repository", "upstream", "warnings"]
       },
       {
+        name: "repo_remote_pull_requests",
+        annotations: remoteReadAnnotations,
+        inputKeys: ["base", "head", "include_checks", "limit", "remote", "repo_id", "state"],
+        outputKeys: ["base", "head", "ok", "pull_requests", "remote", "repository", "state", "truncated", "warnings"]
+      },
+      {
         name: "repo_write_push",
         annotations: remoteWriteAnnotations,
         inputKeys: ["dry_run", "expected_branch", "expected_head_sha", "reason", "remote", "repo_id", "set_upstream"],
@@ -773,6 +783,12 @@ describe("tool catalog contracts", () => {
         annotations: remoteWriteAnnotations,
         inputKeys: ["base", "body", "draft", "dry_run", "expected_branch", "expected_head_sha", "reason", "remote", "repo_id", "title"],
         outputKeys: ["action", "base", "branch", "dry_run", "head_sha", "ok", "pull_request", "remote", "warnings"]
+      },
+      {
+        name: "repo_write_retire_pull_request",
+        annotations: remoteWriteAnnotations,
+        inputKeys: ["comment", "delete_local_branch", "delete_remote_branch", "dry_run", "expected_head_sha", "expected_pull_head_sha", "owner_approved", "pull_number", "reason", "remote", "repo_id"],
+        outputKeys: ["closed", "comment_added", "dry_run", "local_branch_deleted", "ok", "pull_request", "remote_branch_deleted", "warnings"]
       },
       {
         name: "repo_write_sync_base",
@@ -795,10 +811,14 @@ describe("tool catalog contracts", () => {
       ...Object.entries(CreateBranchResultSchema.shape).map(([field, schema]) => [`repo_write_create_branch.${field}`, schema] as [string, { description?: string }]),
       ...Object.entries(RemoteStatusInputSchema.shape).map(([field, schema]) => [`repo_remote_status.${field}`, schema] as [string, { description?: string }]),
       ...Object.entries(RemoteStatusResultSchema.shape).map(([field, schema]) => [`repo_remote_status.${field}`, schema] as [string, { description?: string }]),
+      ...Object.entries(PullRequestListInputSchema.shape).map(([field, schema]) => [`repo_remote_pull_requests.${field}`, schema] as [string, { description?: string }]),
+      ...Object.entries(PullRequestListResultSchema.shape).map(([field, schema]) => [`repo_remote_pull_requests.${field}`, schema] as [string, { description?: string }]),
       ...Object.entries(PushInputSchema.shape).map(([field, schema]) => [`repo_write_push.${field}`, schema] as [string, { description?: string }]),
       ...Object.entries(PushResultSchema.shape).map(([field, schema]) => [`repo_write_push.${field}`, schema] as [string, { description?: string }]),
       ...Object.entries(PullRequestInputSchema.shape).map(([field, schema]) => [`repo_write_pull_request.${field}`, schema] as [string, { description?: string }]),
       ...Object.entries(PullRequestResultSchema.shape).map(([field, schema]) => [`repo_write_pull_request.${field}`, schema] as [string, { description?: string }]),
+      ...Object.entries(RetirePullRequestInputSchema.shape).map(([field, schema]) => [`repo_write_retire_pull_request.${field}`, schema] as [string, { description?: string }]),
+      ...Object.entries(RetirePullRequestResultSchema.shape).map(([field, schema]) => [`repo_write_retire_pull_request.${field}`, schema] as [string, { description?: string }]),
       ...Object.entries(SyncBaseInputSchema.shape).map(([field, schema]) => [`repo_write_sync_base.${field}`, schema] as [string, { description?: string }]),
       ...Object.entries(SyncBaseResultSchema.shape).map(([field, schema]) => [`repo_write_sync_base.${field}`, schema] as [string, { description?: string }]),
       ...Object.entries(MergePullRequestInputSchema.shape).map(([field, schema]) => [`repo_write_merge_pull_request.${field}`, schema] as [string, { description?: string }]),
@@ -807,7 +827,7 @@ describe("tool catalog contracts", () => {
   });
 
   test("exposed tool surface shape stays stable", () => {
-    expect(toolCatalog.filter((tool) => !tool.name.startsWith("repo_remote_") && !["repo_write_create_branch", "repo_git_branches", "repo_write_switch_branch", "repo_write_push", "repo_write_pull_request", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_run_allowed_script", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name)).map((tool) => ({
+    expect(toolCatalog.filter((tool) => !tool.name.startsWith("repo_remote_") && !["repo_write_create_branch", "repo_git_branches", "repo_write_switch_branch", "repo_write_push", "repo_write_pull_request", "repo_write_retire_pull_request", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_run_allowed_script", "repo_write_sync_base", "repo_write_merge_pull_request"].includes(tool.name)).map((tool) => ({
       name: tool.name,
       title: tool.title,
       description: tool.description,

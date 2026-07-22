@@ -67,6 +67,7 @@ All tool errors return:
 | `GIT_BRANCH_EXISTS` | `repo_write_create_branch` was asked to create a local branch that already exists. The tool never switches to existing branches. |
 | `GIT_BRANCH_CREATE_FAILED` | Git did not leave the repository on the expected new branch with unchanged HEAD. |
 | `GIT_BRANCH_NOT_FOUND` | The requested existing local branch was not found. |
+| `GIT_BRANCH_CURRENT` | The requested cleanup branch is currently checked out and cannot be deleted safely. |
 | `GIT_BRANCH_SWITCH_FAILED` | Git did not leave the repository on the verified target branch and HEAD. |
 | `GIT_BRANCH_DELETE_FAILED` | A verified local or remote feature branch still existed after deletion was attempted. |
 | `GIT_DETACHED_HEAD` | A delivery operation requires a named current branch but the repository is detached. |
@@ -77,10 +78,15 @@ All tool errors return:
 | `GIT_REMOTE_BRANCH_NOT_FOUND` | The requested remote base branch was not found during synchronization. |
 | `GITHUB_AUTH_REQUIRED` | A GitHub API operation required a runtime token that was not supplied to the MCP server process. |
 | `GITHUB_API_ERROR` | A GitHub API request failed and was returned as a sanitized error. |
+| `GITHUB_CLI_ERROR` | A fixed GitHub CLI operation failed before the expected result was verified. |
+| `GITHUB_CLI_RESPONSE_INVALID` | GitHub CLI returned output that did not match the required structured JSON contract. |
 | `GITHUB_PR_HEAD_MISMATCH` | The pull-request head changed after owner review. Review the new head before merging. |
 | `GITHUB_PR_NOT_OPEN` | The requested pull request is not open for this merge workflow. |
 | `GITHUB_PR_NOT_MERGED` | Post-merge finalization was requested for a pull request GitHub has not confirmed as merged. |
 | `GITHUB_PR_NOT_MERGEABLE` | GitHub reports that the pull request cannot currently be merged. |
+| `GITHUB_PR_BRANCH_UNSAFE` | The pull-request head is a base branch or otherwise ineligible for retirement cleanup. |
+| `GITHUB_PR_BRANCH_IN_USE` | Another open pull request uses the same head branch, so retirement cleanup was blocked. |
+| `GITHUB_PR_CLOSE_VERIFICATION_FAILED` | GitHub did not confirm the expected closed, unmerged pull request with the approved head SHA. |
 | `GITHUB_CHECKS_NOT_PASSED` | Required known checks were not successful, so merge was not attempted. |
 | `GITHUB_MERGE_REJECTED` | GitHub rejected the requested pull-request merge. |
 | `GIT_HEAD_MISMATCH` | Current HEAD did not match the supplied `expected_head_sha`. |
