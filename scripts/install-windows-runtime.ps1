@@ -101,10 +101,10 @@ $arguments = @(
     "-NonInteractive",
     "-ExecutionPolicy", "Bypass",
     "-WindowStyle", "Hidden",
-    "-File", ('\"{0}\"' -f $launcherPath),
-    "-RepoPath", ('\"{0}\"' -f $RepoPath),
-    "-NodePath", ('\"{0}\"' -f $nodePath),
-    "-NpmCli", ('\"{0}\"' -f $npmCli)
+    "-File", ('"{0}"' -f $launcherPath),
+    "-RepoPath", ('"{0}"' -f $RepoPath),
+    "-NodePath", ('"{0}"' -f $nodePath),
+    "-NpmCli", ('"{0}"' -f $npmCli)
 ) -join " "
 $taskAction = New-ScheduledTaskAction -Execute $powershellPath -Argument $arguments -WorkingDirectory $RepoPath
 $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
