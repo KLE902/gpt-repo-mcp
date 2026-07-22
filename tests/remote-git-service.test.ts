@@ -416,6 +416,50 @@ describe("RemoteGitService", () => {
     });
   });
 
+  test("ignores an empty pending combined status when check runs are successful", async () => {
+    const service = new RemoteGitService("/repo", new OperationsPolicy(), {
+      env: { GPT_REPO_GITHUB_TOKEN: ["runtime", "fixture"].join("-") },
+      git_runner: async (args) => {
+        const command = args.join(" ");
+        if (command === "rev-parse HEAD") return HEAD;
+        if (command === "symbolic-ref --quiet --short HEAD") return "feature/demo";
+        if (command === "status --porcelain=v1 --untracked-files=all") return "";
+        if (command === "rev-parse --abbrev-ref --symbolic-full-name @{upstream}") throw new Error("no upstream");
+        if (command === "ls-remote --heads origin refs/heads/feature/demo") return `${HEAD}\trefs/heads/feature/demo`;
+        if (command === "remote get-url origin") return "https://github.com/acme/demo.git";
+        throw new Error(`Unexpected git call: ${command}`);
+      },
+      fetch_impl: async (input) => {
+        const url = String(input);
+        if (url.endsWith("/pulls/7")) return jsonResponse(pullFixture());
+        if (url.includes("/check-runs")) {
+          return jsonResponse({
+            check_runs: [{
+              name: "Node 20.x",
+              status: "completed",
+              conclusion: "success",
+              started_at: "2026-07-21T20:02:00Z",
+              completed_at: "2026-07-21T20:03:00Z",
+              details_url: "https://github.com/acme/demo/actions/runs/2/job/2"
+            }]
+          });
+        }
+        if (url.includes("/status")) return jsonResponse({ state: "pending", statuses: [] });
+        throw new Error(`Unexpected request: ${url}`);
+      }
+    });
+
+    const output = await service.status({ repo_id: "fixture", remote: "origin", pull_number: 7 });
+    expect(output.checks).toMatchObject({
+      overall: "success",
+      total: 1,
+      successful: 1,
+      pending: 0,
+      failed: 0,
+      items: [{ name: "Node 20.x", state: "success" }]
+    });
+  });
+
   test("fails closed when one GitHub check source cannot be read", async () => {
     const requests: Array<{ url: string; method: string }> = [];
     const service = new RemoteGitService("/repo", new OperationsPolicy({

@@ -571,16 +571,18 @@ export class RemoteGitService {
         ...(summary ? { summary } : {})
       });
     }
-    for (const status of combined?.statuses ?? []) {
+    const commitStatuses = combined?.statuses ?? [];
+    for (const status of commitStatuses) {
       const state = status.state === "success" ? "success" : status.state === "pending" ? "pending" : "failure";
       items.push({ name: status.context, state, ...(status.target_url ? { details_url: status.target_url } : {}) });
     }
     const successful = items.filter((item) => item.state === "success").length;
     const pending = items.filter((item) => item.state === "pending").length;
     const failed = items.filter((item) => item.state === "failure").length;
-    const observedOverall = failed > 0 || combined?.state === "failure" || combined?.state === "error"
+    const hasCommitStatuses = commitStatuses.length > 0;
+    const observedOverall = failed > 0 || (hasCommitStatuses && (combined?.state === "failure" || combined?.state === "error"))
       ? "failure"
-      : pending > 0 || combined?.state === "pending"
+      : pending > 0 || (hasCommitStatuses && combined?.state === "pending")
         ? "pending"
         : items.length > 0
           ? "success"
