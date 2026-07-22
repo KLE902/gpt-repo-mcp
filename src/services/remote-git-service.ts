@@ -156,18 +156,39 @@ export class RemoteGitService {
       throw new RepoReaderError("GIT_ERROR", "Git returned malformed branch ahead/behind counts.");
     }
     const mergedIntoBase = await this.gitSucceeds(["merge-base", "--is-ancestor", branchSha, baseSha]);
+    const cherryEntries = mergedIntoBase ? [] : parseGitCherry(await this.runGit(["cherry", baseSha, branchSha]));
+    const uniquePatchCommits = cherryEntries.filter((entry) => entry.marker === "+").map((entry) => entry.sha);
+    const patchEquivalentToBase = !mergedIntoBase && ahead > 0 && cherryEntries.length > 0 && uniquePatchCommits.length === 0;
     const openPulls = (await this.githubCli.listPulls(`${repository.owner}/${repository.name}`, {
       state: "open",
       head: input.branch,
       limit: 100
     })).map(mapGhPull);
+    const mergedPulls = mergedIntoBase || patchEquivalentToBase
+      ? []
+      : (await this.githubCli.listPulls(`${repository.owner}/${repository.name}`, {
+          state: "closed",
+          base: input.base,
+          limit: 100
+        }))
+          .filter((pull) => Boolean(pull.mergedAt) && pull.headRefOid.toLowerCase() === branchSha.toLowerCase() && pull.baseRefName === input.base)
+          .map(mapGhPull);
+    const retirementEvidence = mergedIntoBase
+      ? "ancestry" as const
+      : patchEquivalentToBase
+        ? "patch_equivalent" as const
+        : mergedPulls.length > 0
+          ? "merged_pull_request" as const
+          : "none" as const;
     const refsAgree = !localBranchSha || !remoteBranchSha || localBranchSha === remoteBranchSha;
     const protectedBranch = input.branch === input.base || input.branch === "main" || input.branch === "master";
     const warnings = unique([
       ...(localBranchSha ? [] : ["LOCAL_BRANCH_ABSENT"]),
       ...(remoteBranchSha ? [] : ["REMOTE_BRANCH_ABSENT"]),
       ...(refsAgree ? [] : ["BRANCH_REF_DIVERGED"]),
-      ...(mergedIntoBase ? [] : ["BRANCH_NOT_MERGED_INTO_BASE"]),
+      ...(retirementEvidence === "none" ? ["BRANCH_NOT_CONTAINED_IN_BASE"] : []),
+      ...(retirementEvidence === "patch_equivalent" ? ["BRANCH_PATCH_EQUIVALENT_TO_BASE"] : []),
+      ...(retirementEvidence === "merged_pull_request" ? ["BRANCH_HEAD_MERGED_BY_PULL_REQUEST"] : []),
       ...(openPulls.length === 0 ? [] : ["BRANCH_HAS_OPEN_PULL_REQUESTS"]),
       ...(state.branch === input.branch ? ["BRANCH_CURRENT"] : []),
       ...(state.clean ? [] : ["WORKTREE_DIRTY"]),
@@ -189,8 +210,12 @@ export class RemoteGitService {
       ahead,
       behind,
       merged_into_base: mergedIntoBase,
+      patch_equivalent_to_base: patchEquivalentToBase,
+      unique_patch_commits: uniquePatchCommits,
+      merged_pull_requests: mergedPulls,
+      retirement_evidence: retirementEvidence,
       open_pull_requests: openPulls,
-      safe_to_retire: state.clean && state.branch !== input.branch && refsAgree && mergedIntoBase && openPulls.length === 0 && !protectedBranch,
+      safe_to_retire: state.clean && state.branch !== input.branch && refsAgree && retirementEvidence !== "none" && openPulls.length === 0 && !protectedBranch,
       warnings
     };
   }
@@ -227,8 +252,8 @@ export class RemoteGitService {
     if (audit.local_branch_sha && audit.remote_branch_sha && audit.local_branch_sha !== audit.remote_branch_sha) {
       throw new RepoReaderError("GIT_BRANCH_REF_DIVERGED", "Local and remote branch refs differ; branch retirement was blocked.");
     }
-    if (!audit.merged_into_base) {
-      throw new RepoReaderError("GIT_BRANCH_NOT_MERGED", "Branch is not fully contained in the exact remote base and cannot be retired safely.");
+    if (audit.retirement_evidence === "none") {
+      throw new RepoReaderError("GIT_BRANCH_NOT_MERGED", "Branch has no exact ancestry, patch-equivalence, or merged pull-request proof in the remote base and cannot be retired safely.");
     }
     if (audit.open_pull_requests.length > 0) {
       throw new RepoReaderError("GITHUB_PR_BRANCH_IN_USE", "An open pull request still uses the branch; retirement was blocked.", {
@@ -251,6 +276,7 @@ export class RemoteGitService {
         ahead: audit.ahead,
         behind: audit.behind,
         local_branch_deleted: false,
+        retirement_evidence: audit.retirement_evidence,
         remote_branch_deleted: false,
         warnings
       };
@@ -295,6 +321,7 @@ export class RemoteGitService {
       ahead: audit.ahead,
       behind: audit.behind,
       local_branch_deleted: localDeleted,
+      retirement_evidence: audit.retirement_evidence,
       remote_branch_deleted: remoteDeleted,
       warnings: unique(warnings)
     };
@@ -1039,6 +1066,18 @@ export function parseGitHubRemote(raw: string): GitHubRepository {
     throw new RepoReaderError("GIT_REMOTE_NOT_GITHUB", "Remote contains an unsupported GitHub owner or repository name.");
   }
   return { owner, name, html_url: `https://github.com/${owner}/${name}` };
+}
+
+function parseGitCherry(raw: string): Array<{ marker: "+" | "-"; sha: string }> {
+  const entries: Array<{ marker: "+" | "-"; sha: string }> = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const match = /^([+-])\s+([a-f0-9]{40})$/i.exec(trimmed);
+    if (!match) throw new RepoReaderError("GIT_ERROR", "Git returned malformed patch-equivalence output.");
+    entries.push({ marker: match[1] as "+" | "-", sha: match[2].toLowerCase() });
+  }
+  return entries;
 }
 
 function mapPull(pull: GitHubPull): PullRequest {
