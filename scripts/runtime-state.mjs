@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, posix as pathPosix, win32 as pathWin32 } from "node:path";
 import process from "node:process";
 
 export const RUNTIME_STATUS_VERSION = 1;
@@ -14,10 +14,10 @@ export function resolveRuntimeDirectory(env = process.env, platform = process.pl
   const configured = env.GPT_REPO_RUNTIME_DIR?.trim();
   if (configured) return configured;
   if (platform === "win32") {
-    const localAppData = env.LOCALAPPDATA?.trim() || join(homeDirectory, "AppData", "Local");
-    return join(localAppData, "gpt-repo-mcp", "runtime");
+    const localAppData = env.LOCALAPPDATA?.trim() || pathWin32.join(homeDirectory, "AppData", "Local");
+    return pathWin32.join(localAppData, "gpt-repo-mcp", "runtime");
   }
-  return join(homeDirectory, ".gpt-repo-mcp", "runtime");
+  return pathPosix.join(homeDirectory, ".gpt-repo-mcp", "runtime");
 }
 
 export function runtimePaths(runtimeDirectory = resolveRuntimeDirectory()) {

@@ -19,6 +19,8 @@ describe("supervised runtime control", () => {
       .toBe("C:\\Users\\demo\\AppData\\Local\\gpt-repo-mcp\\runtime");
     expect(resolveRuntimeDirectory({ GPT_REPO_RUNTIME_DIR: "D:\\runtime" }, "win32", "C:\\Users\\demo"))
       .toBe("D:\\runtime");
+    expect(resolveRuntimeDirectory({}, "linux", "/home/demo"))
+      .toBe("/home/demo/.gpt-repo-mcp/runtime");
   });
 
   test("creates delayed bounded restart requests", () => {
