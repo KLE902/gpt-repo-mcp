@@ -1,4 +1,5 @@
 import { BranchUpdateInputSchema, BranchUpdateResultSchema } from "../src/contracts/branch-update.contract.js";
+import { BranchAuditInputSchema, BranchAuditResultSchema, RetireBranchInputSchema, RetireBranchResultSchema } from "../src/contracts/branch-lifecycle.contract.js";
 import { readFileSync } from "node:fs";
 
 import { describe, expect, test } from "vitest";
@@ -92,7 +93,9 @@ describe("tool catalog contracts", () => {
       "repo_codex_review",
       "repo_write_file",
       "repo_write_changes",
-      "repo_write_handoff"
+      "repo_write_handoff",
+      "repo_branch_audit",
+      "repo_write_retire_branch"
     ]);
 
     for (const tool of toolCatalog) {
@@ -100,9 +103,9 @@ describe("tool catalog contracts", () => {
       expect(tool.description.startsWith("Use this when")).toBe(true);
       expect(tool.inputSchema).toBeDefined();
       expect(tool.outputSchema).toBeDefined();
-      if (["repo_remote_status", "repo_remote_pull_requests", "repo_git_branches"].includes(tool.name)) {
+      if (["repo_remote_status", "repo_remote_pull_requests", "repo_git_branches", "repo_branch_audit"].includes(tool.name)) {
         expect(tool.annotations).toEqual(remoteReadAnnotations);
-      } else if (["repo_write_push", "repo_write_pull_request", "repo_write_retire_pull_request", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_write_sync_base", "repo_write_update_branch_from_base", "repo_write_merge_pull_request"].includes(tool.name)) {
+      } else if (["repo_write_push", "repo_write_pull_request", "repo_write_retire_pull_request", "repo_write_retire_branch", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_write_sync_base", "repo_write_update_branch_from_base", "repo_write_merge_pull_request"].includes(tool.name)) {
         expect(tool.annotations).toEqual(remoteWriteAnnotations);
       } else if (isMutatingToolName(tool.name)) {
         expect(tool.annotations).toEqual(writeAnnotations);
@@ -116,6 +119,7 @@ describe("tool catalog contracts", () => {
   test("mutating tools use central contracts and annotations", () => {
     expect(MUTATING_TOOL_NAMES.filter((name) => !["repo_write_switch_branch", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_run_allowed_script"].includes(name))).toEqual([
       "repo_write_create_branch",
+      "repo_write_retire_branch",
       "repo_write_file",
       "repo_write_changes",
       "repo_write_handoff",
@@ -748,7 +752,7 @@ describe("tool catalog contracts", () => {
 
   test("delivery tool surface stays exact with local branch creation and open-world remote operations", () => {
     const remoteTools = toolCatalog
-      .filter((tool) => ["repo_write_create_branch", "repo_remote_status", "repo_remote_pull_requests", "repo_write_push", "repo_write_pull_request", "repo_write_retire_pull_request", "repo_write_sync_base", "repo_write_update_branch_from_base", "repo_write_merge_pull_request"].includes(tool.name))
+      .filter((tool) => ["repo_write_create_branch", "repo_remote_status", "repo_remote_pull_requests", "repo_write_push", "repo_write_pull_request", "repo_write_retire_pull_request", "repo_write_sync_base", "repo_write_update_branch_from_base", "repo_write_merge_pull_request", "repo_branch_audit", "repo_write_retire_branch"].includes(tool.name))
       .map((tool) => ({
         name: tool.name,
         annotations: tool.annotations,
@@ -810,6 +814,18 @@ describe("tool catalog contracts", () => {
         annotations: remoteWriteAnnotations,
         inputKeys: ["dry_run", "expected_head_sha", "expected_pull_head_sha", "merge_method", "owner_approved", "pull_number", "reason", "remote", "repo_id", "require_checks_passed", "sync_local_base"],
         outputKeys: ["checks", "dry_run", "merge_method", "merge_sha", "merged", "message", "ok", "pull_request", "sync", "warnings"]
+      },
+      {
+        name: "repo_branch_audit",
+        annotations: remoteReadAnnotations,
+        inputKeys: ["base", "branch", "remote", "repo_id"],
+        outputKeys: ["ahead", "base", "base_sha", "behind", "branch", "branch_sha", "clean", "current_branch", "head_sha", "local_branch_sha", "merge_base_sha", "merged_into_base", "ok", "open_pull_requests", "remote", "remote_branch_sha", "safe_to_retire", "warnings"]
+      },
+      {
+        name: "repo_write_retire_branch",
+        annotations: remoteWriteAnnotations,
+        inputKeys: ["base", "branch", "delete_local_branch", "delete_remote_branch", "dry_run", "expected_base_sha", "expected_branch_sha", "expected_head_sha", "owner_approved", "reason", "remote", "repo_id"],
+        outputKeys: ["ahead", "base", "base_sha", "behind", "branch", "branch_sha", "dry_run", "local_branch_deleted", "ok", "remote", "remote_branch_deleted", "warnings"]
       }
     ]);
   });
@@ -833,12 +849,16 @@ describe("tool catalog contracts", () => {
       ...Object.entries(BranchUpdateInputSchema.shape).map(([field, schema]) => [`repo_write_update_branch_from_base.${field}`, schema] as [string, { description?: string }]),
       ...Object.entries(BranchUpdateResultSchema.shape).map(([field, schema]) => [`repo_write_update_branch_from_base.${field}`, schema] as [string, { description?: string }]),
       ...Object.entries(MergePullRequestInputSchema.shape).map(([field, schema]) => [`repo_write_merge_pull_request.${field}`, schema] as [string, { description?: string }]),
-      ...Object.entries(MergePullRequestResultSchema.shape).map(([field, schema]) => [`repo_write_merge_pull_request.${field}`, schema] as [string, { description?: string }])
+      ...Object.entries(MergePullRequestResultSchema.shape).map(([field, schema]) => [`repo_write_merge_pull_request.${field}`, schema] as [string, { description?: string }]),
+      ...Object.entries(BranchAuditInputSchema.shape).map(([field, schema]) => [`repo_branch_audit.${field}`, schema] as [string, { description?: string }]),
+      ...Object.entries(BranchAuditResultSchema.shape).map(([field, schema]) => [`repo_branch_audit.${field}`, schema] as [string, { description?: string }]),
+      ...Object.entries(RetireBranchInputSchema.shape).map(([field, schema]) => [`repo_write_retire_branch.${field}`, schema] as [string, { description?: string }]),
+      ...Object.entries(RetireBranchResultSchema.shape).map(([field, schema]) => [`repo_write_retire_branch.${field}`, schema] as [string, { description?: string }])
     ]);
   });
 
   test("exposed tool surface shape stays stable", () => {
-    expect(toolCatalog.filter((tool) => !tool.name.startsWith("repo_remote_") && !["repo_write_create_branch", "repo_git_branches", "repo_write_switch_branch", "repo_write_push", "repo_write_pull_request", "repo_write_retire_pull_request", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_run_allowed_script", "repo_write_sync_base", "repo_write_update_branch_from_base", "repo_write_merge_pull_request"].includes(tool.name)).map((tool) => ({
+    expect(toolCatalog.filter((tool) => !tool.name.startsWith("repo_remote_") && !["repo_write_create_branch", "repo_git_branches", "repo_branch_audit", "repo_write_retire_branch", "repo_write_switch_branch", "repo_write_push", "repo_write_pull_request", "repo_write_retire_pull_request", "repo_write_finalize_pull_request", "repo_write_dispatch_workflow", "repo_run_allowed_script", "repo_write_sync_base", "repo_write_update_branch_from_base", "repo_write_merge_pull_request"].includes(tool.name)).map((tool) => ({
       name: tool.name,
       title: tool.title,
       description: tool.description,

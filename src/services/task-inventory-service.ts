@@ -8,6 +8,9 @@ import { readFilePrefix } from "./bounded-read.js";
 import type { TaskInventoryInput, TaskKind } from "../contracts/task.contract.js";
 
 const DEFAULT_LABELS: TaskKind[] = ["todo", "fixme", "hack", "checkbox", "roadmap"];
+const DEFAULT_TASK_EXCLUDES = [".chatgpt/handoffs/**"];
+const MARKDOWN_PATH = /\.(?:md|mdx)$/i;
+const CODE_PATH = /\.(?:c|cc|cpp|cs|go|java|js|jsx|kt|kts|mjs|mts|php|py|rb|rs|sh|swift|ts|tsx|vue)$/i;
 
 export type TaskInventoryOptions = Omit<TaskInventoryInput, "repo_id">;
 
@@ -50,6 +53,9 @@ export class TaskInventoryService {
         if (entry.type !== "file") {
           continue;
         }
+        if ((options.include_globs?.length ?? 0) === 0 && isExcludedByGlob(entry.path, DEFAULT_TASK_EXCLUDES)) {
+          continue;
+        }
         if (!isIncluded(entry.path, options.include_globs) || isExcludedByGlob(entry.path, options.exclude_globs)) {
           continue;
         }
@@ -74,7 +80,7 @@ export class TaskInventoryService {
         const text = readResult.buffer.toString("utf8");
         const lines = text.split(/\r?\n/);
         lines.forEach((lineText, index) => {
-          const kind = classifyTask(lineText, labels);
+          const kind = classifyTask(lineText, labels, entry.path);
           if (!kind) {
             return;
           }
@@ -129,23 +135,28 @@ export class TaskInventoryService {
   }
 }
 
-function classifyTask(line: string, labels: Set<TaskKind>): TaskKind | undefined {
-  if (labels.has("checkbox") && /^\s*[-*]\s+\[[ xX]\]\s+\S/.test(line)) {
+function classifyTask(line: string, labels: Set<TaskKind>, path: string): TaskKind | undefined {
+  const trimmed = line.trim();
+  const markdown = MARKDOWN_PATH.test(path);
+  const code = CODE_PATH.test(path);
+  if (labels.has("checkbox") && markdown && /^[-*]\s+\[ \]\s+\S/.test(trimmed)) {
     return "checkbox";
   }
-  if (labels.has("fixme") && /\bFIXME\b:?/i.test(line)) {
-    return "fixme";
+  const marker = taskMarker(trimmed, code);
+  if (marker && labels.has(marker)) {
+    return marker;
   }
-  if (labels.has("hack") && /\bHACK\b:?/i.test(line)) {
-    return "hack";
-  }
-  if (labels.has("todo") && /\bTODO\b:?/i.test(line)) {
-    return "todo";
-  }
-  if (labels.has("roadmap") && /\b(ROADMAP|NEXT STEPS?|FOLLOW[- ]?UP)\b:?/i.test(line)) {
+  if (labels.has("roadmap") && markdown && /^(?:#{1,6}\s*)?(?:ROADMAP|NEXT STEPS?|FOLLOW[- ]?UP)\b:?/i.test(trimmed)) {
     return "roadmap";
   }
   return undefined;
+}
+
+function taskMarker(line: string, code: boolean): "todo" | "fixme" | "hack" | undefined {
+  const match = code
+    ? line.match(/(?:^|\s)(?:\/\/|\/\*+|\*|#)\s*(TODO|FIXME|HACK)\b:?/i)
+    : line.match(/^(?:[-*]\s+)?(?:<!--\s*)?(TODO|FIXME|HACK)\b:?/i);
+  return match?.[1]?.toLowerCase() as "todo" | "fixme" | "hack" | undefined;
 }
 
 function cleanTaskText(line: string): string {

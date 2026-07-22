@@ -11,6 +11,7 @@ import type {
   SyncBaseInput
 } from "../contracts/remote-git.contract.js";
 import type { PullRequestListInput, RetirePullRequestInput } from "../contracts/pull-retirement.contract.js";
+import type { BranchAuditInput, RetireBranchInput } from "../contracts/branch-lifecycle.contract.js";
 import type {
   BranchListInput,
   FinalizePullRequestInput,
@@ -124,6 +125,178 @@ export class RemoteGitService {
       local_branches: parseBranchLines(localOutput, state.branch, false),
       remote_branches: parseBranchLines(remoteOutput, state.branch, true),
       warnings: [] as string[]
+    };
+  }
+
+  async auditBranch(input: BranchAuditInput) {
+    this.assertOrigin(input.remote);
+    const state = await this.localState();
+    await this.validateBranch(input.branch);
+    await this.validateBranch(input.base);
+    const repository = await this.repositoryFor(input.remote);
+    const localBranchSha = await this.tryGit(["rev-parse", `refs/heads/${input.branch}`]);
+    const remoteBranchSha = await this.readRemoteHead(input.remote, input.branch);
+    if (!localBranchSha && !remoteBranchSha) {
+      throw new RepoReaderError("GIT_BRANCH_NOT_FOUND", `Branch ${input.branch} does not exist locally or on ${input.remote}.`);
+    }
+    const baseSha = await this.readRemoteHead(input.remote, input.base);
+    if (!baseSha) {
+      throw new RepoReaderError("GIT_REMOTE_BRANCH_NOT_FOUND", `Remote base branch ${input.remote}/${input.base} was not found.`);
+    }
+    const branchSha = localBranchSha ?? remoteBranchSha!;
+    await this.ensureCommitAvailable(input.remote, input.branch, branchSha);
+    await this.ensureCommitAvailable(input.remote, input.base, baseSha);
+    const mergeBaseSha = await this.tryGit(["merge-base", branchSha, baseSha]);
+    const counts = (await this.runGit(["rev-list", "--left-right", "--count", `${baseSha}...${branchSha}`]))
+      .split(/\s+/)
+      .map(Number);
+    const behind = counts[0] ?? 0;
+    const ahead = counts[1] ?? 0;
+    if (!Number.isSafeInteger(ahead) || !Number.isSafeInteger(behind) || ahead < 0 || behind < 0) {
+      throw new RepoReaderError("GIT_ERROR", "Git returned malformed branch ahead/behind counts.");
+    }
+    const mergedIntoBase = await this.gitSucceeds(["merge-base", "--is-ancestor", branchSha, baseSha]);
+    const openPulls = (await this.githubCli.listPulls(`${repository.owner}/${repository.name}`, {
+      state: "open",
+      head: input.branch,
+      limit: 100
+    })).map(mapGhPull);
+    const refsAgree = !localBranchSha || !remoteBranchSha || localBranchSha === remoteBranchSha;
+    const protectedBranch = input.branch === input.base || input.branch === "main" || input.branch === "master";
+    const warnings = unique([
+      ...(localBranchSha ? [] : ["LOCAL_BRANCH_ABSENT"]),
+      ...(remoteBranchSha ? [] : ["REMOTE_BRANCH_ABSENT"]),
+      ...(refsAgree ? [] : ["BRANCH_REF_DIVERGED"]),
+      ...(mergedIntoBase ? [] : ["BRANCH_NOT_MERGED_INTO_BASE"]),
+      ...(openPulls.length === 0 ? [] : ["BRANCH_HAS_OPEN_PULL_REQUESTS"]),
+      ...(state.branch === input.branch ? ["BRANCH_CURRENT"] : []),
+      ...(state.clean ? [] : ["WORKTREE_DIRTY"]),
+      ...(protectedBranch ? ["PROTECTED_BRANCH"] : [])
+    ]);
+    return {
+      ok: true as const,
+      remote: input.remote,
+      branch: input.branch,
+      base: input.base,
+      current_branch: state.branch,
+      head_sha: state.head,
+      clean: state.clean,
+      ...(localBranchSha ? { local_branch_sha: localBranchSha } : {}),
+      ...(remoteBranchSha ? { remote_branch_sha: remoteBranchSha } : {}),
+      branch_sha: branchSha,
+      base_sha: baseSha,
+      ...(mergeBaseSha ? { merge_base_sha: mergeBaseSha } : {}),
+      ahead,
+      behind,
+      merged_into_base: mergedIntoBase,
+      open_pull_requests: openPulls,
+      safe_to_retire: state.clean && state.branch !== input.branch && refsAgree && mergedIntoBase && openPulls.length === 0 && !protectedBranch,
+      warnings
+    };
+  }
+
+  async retireBranch(input: RetireBranchInput) {
+    this.assertOrigin(input.remote);
+    if (!input.delete_local_branch && !input.delete_remote_branch) {
+      throw new RepoReaderError("VALIDATION_ERROR", "Branch retirement must request local or remote branch deletion.");
+    }
+    if (input.delete_local_branch) this.policy.assertBranchManageAllowed();
+    if (input.delete_remote_branch) this.policy.assertPushAllowed();
+    const state = await this.localState(input.expected_head_sha);
+    this.assertClean(state.clean);
+    const audit = await this.auditBranch(input);
+    if (audit.head_sha !== input.expected_head_sha) {
+      throw new RepoReaderError("GIT_HEAD_MISMATCH", "Repository HEAD changed during branch-retirement validation.");
+    }
+    if (audit.base_sha !== input.expected_base_sha) {
+      throw new RepoReaderError("GIT_REMOTE_HEAD_MISMATCH", "Remote base branch changed after review; rerun the branch audit.", {
+        diagnostics: { expected_head_sha: input.expected_base_sha, actual_head_sha: audit.base_sha }
+      });
+    }
+    if (audit.branch_sha !== input.expected_branch_sha || (audit.local_branch_sha && audit.local_branch_sha !== input.expected_branch_sha) || (audit.remote_branch_sha && audit.remote_branch_sha !== input.expected_branch_sha)) {
+      throw new RepoReaderError("GIT_HEAD_MISMATCH", "Branch ref changed after review; rerun the branch audit.", {
+        diagnostics: { expected_head_sha: input.expected_branch_sha, actual_head_sha: audit.branch_sha }
+      });
+    }
+    if (audit.branch === audit.base || audit.branch === "main" || audit.branch === "master") {
+      throw new RepoReaderError("GITHUB_PR_BRANCH_UNSAFE", "Main, master, and the selected base branch cannot be retired.");
+    }
+    if (audit.current_branch === audit.branch) {
+      throw new RepoReaderError("GIT_BRANCH_CURRENT", "Switch away from the branch before retiring it.");
+    }
+    if (audit.local_branch_sha && audit.remote_branch_sha && audit.local_branch_sha !== audit.remote_branch_sha) {
+      throw new RepoReaderError("GIT_BRANCH_REF_DIVERGED", "Local and remote branch refs differ; branch retirement was blocked.");
+    }
+    if (!audit.merged_into_base) {
+      throw new RepoReaderError("GIT_BRANCH_NOT_MERGED", "Branch is not fully contained in the exact remote base and cannot be retired safely.");
+    }
+    if (audit.open_pull_requests.length > 0) {
+      throw new RepoReaderError("GITHUB_PR_BRANCH_IN_USE", "An open pull request still uses the branch; retirement was blocked.", {
+        diagnostics: { pull_numbers: audit.open_pull_requests.map((pull) => pull.number).join(",") }
+      });
+    }
+    const warnings = [
+      ...(input.delete_local_branch && !audit.local_branch_sha ? ["LOCAL_BRANCH_ALREADY_ABSENT"] : []),
+      ...(input.delete_remote_branch && !audit.remote_branch_sha ? ["REMOTE_BRANCH_ALREADY_ABSENT"] : [])
+    ];
+    if (input.dry_run) {
+      return {
+        ok: true as const,
+        dry_run: true,
+        remote: input.remote,
+        branch: audit.branch,
+        branch_sha: audit.branch_sha,
+        base: audit.base,
+        base_sha: audit.base_sha,
+        ahead: audit.ahead,
+        behind: audit.behind,
+        local_branch_deleted: false,
+        remote_branch_deleted: false,
+        warnings
+      };
+    }
+    const repository = await this.repositoryFor(input.remote);
+    const openPulls = await this.githubCli.listPulls(`${repository.owner}/${repository.name}`, { state: "open", head: input.branch, limit: 100 });
+    if (openPulls.length > 0) {
+      throw new RepoReaderError("GITHUB_PR_BRANCH_IN_USE", "An open pull request appeared during retirement validation; no branch was deleted.");
+    }
+    let localDeleted = false;
+    if (input.delete_local_branch && audit.local_branch_sha) {
+      const localBefore = await this.tryGit(["rev-parse", `refs/heads/${input.branch}`]);
+      if (localBefore !== input.expected_branch_sha) {
+        throw new RepoReaderError("GIT_HEAD_MISMATCH", "Local branch changed immediately before deletion.");
+      }
+      await this.runGit(["branch", "-D", input.branch]);
+      if (await this.tryGit(["rev-parse", `refs/heads/${input.branch}`])) {
+        throw new RepoReaderError("GIT_BRANCH_DELETE_FAILED", "Local retired branch still exists after deletion.");
+      }
+      localDeleted = true;
+    }
+    let remoteDeleted = false;
+    if (input.delete_remote_branch && audit.remote_branch_sha) {
+      const remoteBefore = await this.readRemoteHead(input.remote, input.branch);
+      if (remoteBefore !== input.expected_branch_sha) {
+        throw new RepoReaderError("GIT_REMOTE_HEAD_MISMATCH", "Remote branch changed immediately before deletion.");
+      }
+      await this.runGit(["push", "--porcelain", input.remote, `:refs/heads/${input.branch}`]);
+      if (await this.readRemoteHead(input.remote, input.branch)) {
+        throw new RepoReaderError("GIT_BRANCH_DELETE_FAILED", "Remote retired branch still exists after deletion.");
+      }
+      remoteDeleted = true;
+    }
+    return {
+      ok: true as const,
+      dry_run: false,
+      remote: input.remote,
+      branch: audit.branch,
+      branch_sha: audit.branch_sha,
+      base: audit.base,
+      base_sha: audit.base_sha,
+      ahead: audit.ahead,
+      behind: audit.behind,
+      local_branch_deleted: localDeleted,
+      remote_branch_deleted: remoteDeleted,
+      warnings: unique(warnings)
     };
   }
 
@@ -792,6 +965,23 @@ export class RemoteGitService {
     const output = await this.runGit(["ls-remote", "--heads", remote, `refs/heads/${branch}`]);
     const sha = output.split(/\s+/)[0];
     return /^[a-f0-9]{40}$/i.test(sha ?? "") ? sha : undefined;
+  }
+
+  private async ensureCommitAvailable(remote: string, branch: string, sha: string): Promise<void> {
+    if (await this.gitSucceeds(["cat-file", "-e", `${sha}^{commit}`])) return;
+    await this.runGit(["fetch", "--no-tags", "--no-write-fetch-head", remote, `refs/heads/${branch}`]);
+    if (!await this.gitSucceeds(["cat-file", "-e", `${sha}^{commit}`])) {
+      throw new RepoReaderError("GIT_ERROR", `Commit ${sha} for ${remote}/${branch} is not available for ancestry analysis.`);
+    }
+  }
+
+  private async gitSucceeds(args: string[]): Promise<boolean> {
+    try {
+      await this.runGit(args);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private async runGit(args: string[]): Promise<string> {

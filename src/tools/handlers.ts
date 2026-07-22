@@ -50,6 +50,7 @@ import type { CleanupPathsInput } from "../contracts/cleanup.contract.js";
 import type { HandoffInput } from "../contracts/handoff.contract.js";
 import type { CreateBranchInput, MergePullRequestInput, PullRequestInput, PushInput, RemoteStatusInput, SyncBaseInput } from "../contracts/remote-git.contract.js";
 import type { BranchUpdateInput } from "../contracts/branch-update.contract.js";
+import type { BranchAuditInput, RetireBranchInput } from "../contracts/branch-lifecycle.contract.js";
 import type { AllowedScriptInput, BranchListInput, FinalizePullRequestInput, SwitchBranchInput, WorkflowDispatchInput } from "../contracts/autonomous-operations.contract.js";
 
 type RepoInput = { repo_id: string };
@@ -162,6 +163,20 @@ export const gitBranchesHandler: ToolHandler = async (input, context) => safeToo
   const result = await new RemoteGitService(repo.root, new OperationsPolicy(repo.operations)).branches(args);
   audit({ tool: "repo_git_branches", repo_id: args.repo_id, counts: { local: result.local_branches.length, remote: result.remote_branches.length }, warnings: result.warnings });
   return createSuccessEnvelope(result, `Found ${result.local_branches.length} local and ${result.remote_branches.length} remote branches.`, { warnings: result.warnings });
+});
+
+export const branchAuditHandler: ToolHandler = async (input, context) => safeTool<BranchAuditInput>("repo_branch_audit", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await new RemoteGitService(repo.root, new OperationsPolicy(repo.operations)).auditBranch(args);
+  audit({ tool: "repo_branch_audit", repo_id: args.repo_id, counts: { ahead: result.ahead, behind: result.behind, open_pull_requests: result.open_pull_requests.length }, warnings: result.warnings });
+  return createSuccessEnvelope(result, result.safe_to_retire ? `${result.branch} is safe to retire into ${result.base}.` : `${result.branch} is not currently safe to retire.`, { warnings: result.warnings });
+});
+
+export const writeRetireBranchHandler: ToolHandler = async (input, context) => safeTool<RetireBranchInput>("repo_write_retire_branch", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await new RemoteGitService(repo.root, new OperationsPolicy(repo.operations)).retireBranch(args);
+  audit({ tool: "repo_write_retire_branch", repo_id: args.repo_id, warnings: result.warnings });
+  return createSuccessEnvelope(result, result.dry_run ? `Dry run validated retirement of ${result.branch}.` : `Retired branch ${result.branch}.`, { warnings: result.warnings });
 });
 
 export const writeSwitchBranchHandler: ToolHandler = async (input, context) => safeTool<SwitchBranchInput>("repo_write_switch_branch", input, context, async (args) => {

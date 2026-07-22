@@ -1,4 +1,5 @@
 import { BranchUpdateInputSchema, BranchUpdateResultSchema } from "../contracts/branch-update.contract.js";
+import { BranchAuditInputSchema, BranchAuditResultSchema, RetireBranchInputSchema, RetireBranchResultSchema } from "../contracts/branch-lifecycle.contract.js";
 import type { z } from "zod";
 import { AllowedScriptInputSchema, AllowedScriptResultSchema, BranchListInputSchema, BranchListResultSchema, FinalizePullRequestInputSchema, FinalizePullRequestResultSchema, SwitchBranchInputSchema, SwitchBranchResultSchema, WorkflowDispatchInputSchema, WorkflowDispatchResultSchema } from "../contracts/autonomous-operations.contract.js";
 import { ChangePlanInputSchema, ChangePlanResultSchema } from "../contracts/change-plan.contract.js";
@@ -36,6 +37,8 @@ export type ToolName =
   | "repo_git_review"
   | "repo_write_create_branch"
   | "repo_git_branches"
+  | "repo_branch_audit"
+  | "repo_write_retire_branch"
   | "repo_write_switch_branch"
   | "repo_remote_status"
   | "repo_remote_pull_requests"
@@ -124,6 +127,14 @@ export const toolContracts = {
   repo_git_branches: {
     input: BranchListInputSchema,
     output: BranchListResultSchema
+  },
+  repo_branch_audit: {
+    input: BranchAuditInputSchema,
+    output: BranchAuditResultSchema
+  },
+  repo_write_retire_branch: {
+    input: RetireBranchInputSchema,
+    output: RetireBranchResultSchema
   },
   repo_write_switch_branch: {
     input: SwitchBranchInputSchema,
