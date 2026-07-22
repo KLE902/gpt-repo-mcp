@@ -26,6 +26,8 @@ The default OSS connection path is `npm run connect`. It starts the local MCP se
 
 That stable local path value is guess-resistance only, not authentication. Anyone with the full URL can reach the MCP endpoint while the public tunnel is running, so keep the endpoint active only when needed.
 
+The optional supervised Windows runtime does not broaden the remote command surface. Its user-local control document accepts only versioned fixed actions. The ChatGPT allowlist exposes status and delayed MCP-only restart; it cannot supply executable names, commands, arguments, paths, or environment values. The out-of-process supervisor performs the restart after the current tool response and keeps ngrok separate from ordinary MCP reloads. Runtime status and logs stay outside Git, and the stable public path value is redacted from supervisor logs.
+
 Network exposure does not bypass repository policy. ChatGPT still supplies only `repo_id`; approved roots, default excludes, path sandboxing, secret checks, read/write policies, expected HEAD checks, and tool schemas still apply. Mutating tools remain disabled unless the target repo explicitly enables writes or operations.
 
 OpenAI Secure MCP Tunnel is an advanced option for longer-lived or private connector setups when supported. In that mode, the local MCP endpoint stays private at `/mcp`, while `tunnel-client` opens an outbound connection to OpenAI and forwards MCP requests back to the local server. Store the tunnel runtime API key in `.env` or another local secret store, never in committed files.

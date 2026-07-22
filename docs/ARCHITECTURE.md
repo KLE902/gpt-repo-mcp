@@ -15,6 +15,8 @@ GPT Repo MCP (`gpt-repo-mcp`) is a tool-only MCP server. There is no widget in v
 - `src/services/*` contains filesystem, git, search, tree, read, write, project, task, decision, and advisory planning logic.
 - `src/policies/*` contains shared limits, excludes, write defaults, and secret patterns.
 - `src/runtime/*` contains context, structured errors, result envelopes, and audit logging.
+- `scripts/runtime-supervisor.mjs` is the optional out-of-process Windows lifecycle owner for the compiled MCP server and ngrok.
+- `scripts/runtime-control.mjs` writes validated user-local fixed-action requests; it is not a process runner.
 
 ## Tool Registration Flow
 
@@ -61,6 +63,14 @@ Git recovery is separate from write tools. `repo_write_file` and `repo_write_cha
 The preferred high-level mutation flow is `repo_git_review` followed by the review-provided `repo_write_stage_commit` or `repo_write_recover` payload within the already authorized implementation or recovery task. Granular tools remain available for specific requested operations, staged-only commits, troubleshooting, or cases where composite payloads are absent.
 
 When work starts on a base branch, the reviewed delivery continuation begins with `repo_write_create_branch`, which creates a new branch from the exact current source branch and HEAD and may carry reviewed index/worktree state. Existing clean branches can be inspected with `repo_git_branches` and opened with `repo_write_switch_branch` under separate branch-management policy. After local review and commit, delivery continues through `repo_write_push` → `repo_write_pull_request` → `repo_remote_status`. `repo_remote_pull_requests` provides bounded repository-wide PR listing through fixed structured GitHub CLI arguments. Draft-ready remains a fixed allowlisted GitHub CLI wrapper. An explicitly owner-approved open, unmerged PR can be closed with `repo_write_retire_pull_request`; the tool verifies the exact PR head SHA, confirms no other open PR uses the head branch, invokes `gh pr close` without `--delete-branch`, verifies closure, and then delegates exact local and origin ref cleanup to the existing guarded Git layer. The normal merge flow stops for explicit owner approval before `repo_write_merge_pull_request`. After GitHub confirms the merge, `repo_write_finalize_pull_request` can synchronize and switch to the base and delete only refs proven to match the exact merged PR head. Remote state changes use exact local, branch, ref, and pull-request head guards. `repo_write_dispatch_workflow` and `repo_run_allowed_script` provide bounded remote and local validation without accepting caller-supplied commands.
+
+## Runtime Supervision
+
+The optional Windows runtime deliberately lives outside `src/server.ts`. A process that handles MCP requests cannot provide reliable crash recovery or safely replace itself while returning the request that initiated the replacement.
+
+`runtime-supervisor.mjs` is started by a current-user Task Scheduler task. It owns the compiled `dist/server.js` child and either reuses an active ngrok agent or owns an ngrok child. MCP and tunnel failures are isolated and restarted independently. Heartbeat, lock, log, and control documents live under user-local application data rather than the repository.
+
+`runtime-control.mjs` supports only versioned fixed actions. The allowlisted ChatGPT path exposes status and delayed MCP-only restart. It accepts no executable, command text, argument, path, or environment override from the caller. A delayed request lets the current MCP tool response complete before the supervisor replaces the server child. The tunnel remains active during ordinary MCP reloads.
 
 ## Advisory Planning Workflows
 

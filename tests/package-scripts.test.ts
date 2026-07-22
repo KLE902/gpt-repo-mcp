@@ -27,6 +27,11 @@ describe("package startup scripts", () => {
     expect(pkg.scripts?.["install:desktop-launcher"]).toBe(
       "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-desktop-launcher.ps1"
     );
+    expect(pkg.scripts?.["runtime:supervise"]).toBe("node scripts/runtime-supervisor.mjs");
+    expect(pkg.scripts?.["runtime:status"]).toBe("node scripts/runtime-control.mjs status");
+    expect(pkg.scripts?.["runtime:restart"]).toBe("node scripts/runtime-control.mjs restart-mcp");
+    expect(pkg.scripts?.["install:windows-runtime"]).toContain("scripts/install-windows-runtime.ps1");
+    expect(pkg.scripts?.["uninstall:windows-runtime"]).toContain("-Action Uninstall");
     expect(pkg.scripts?.add).toBe("node dist/cli/connect-gpt.js add");
     expect(pkg.scripts?.remove).toBe("node dist/cli/connect-gpt.js remove");
     expect(pkg.scripts?.list).toBe("node dist/cli/connect-gpt.js list");
@@ -49,6 +54,25 @@ describe("package startup scripts", () => {
     expect(script).toContain("readNgrokHttpsUrl");
   });
 
+  test("includes a bounded supervised Windows runtime", async () => {
+    const supervisor = await readFile(join(process.cwd(), "scripts", "runtime-supervisor.mjs"), "utf8");
+    const control = await readFile(join(process.cwd(), "scripts", "runtime-control.mjs"), "utf8");
+    const installer = await readFile(join(process.cwd(), "scripts", "install-windows-runtime.ps1"), "utf8");
+
+    expect(supervisor).toContain("runtime control action");
+    expect(supervisor).toContain("restart_mcp");
+    expect(supervisor).toContain("server.js");
+    expect(supervisor).toContain("ensureGitHubRuntimeAccess");
+    expect(supervisor).toContain("readNgrokHttpsUrl");
+    expect(control).toContain("restart scheduled after the current tool response");
+    expect(control).not.toContain("execFile");
+    expect(control).not.toContain("spawn");
+    expect(installer).toContain("New-ScheduledTaskSettingsSet");
+    expect(installer).toContain("RestartCount 99");
+    expect(installer).toContain("mcp.runtime.status");
+    expect(installer).toContain("mcp.runtime.restart");
+  });
+
   test("includes a Windows desktop launcher installer", async () => {
     const installerPath = join(process.cwd(), "scripts", "install-desktop-launcher.ps1");
     await expect(access(installerPath)).resolves.toBeUndefined();
@@ -58,6 +82,20 @@ describe("package startup scripts", () => {
     expect(installer).toContain("npm.cmd run connect");
     expect(installer).toContain("Keep the window open");
 
+  });
+
+  test("Windows runtime installer parses as PowerShell", async () => {
+    if (process.platform !== "win32") return;
+    const installerPath = join(process.cwd(), "scripts", "install-windows-runtime.ps1");
+    const escapedPath = installerPath.replaceAll("'", "''");
+    const command = [
+      "$lexemes = $null",
+      "$parseIssues = $null",
+      `[System.Management.Automation.Language.Parser]::ParseFile('${escapedPath}', [ref]$lexemes, [ref]$parseIssues) | Out-Null`,
+      "if ($parseIssues.Count -gt 0) { $parseIssues | ForEach-Object { Write-Error $_ }; exit 1 }"
+    ].join("; ");
+    await expect(run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", command], process.cwd()))
+      .resolves.toBeDefined();
   });
 
   test("includes secure tunnel startup script and env example", async () => {
