@@ -52,6 +52,33 @@ describe("GitService", () => {
     ]));
   });
 
+  test("preserves base-to-compare direction for ref diffs", async () => {
+    const root = await createGitFixture();
+    const base = await git(root, ["rev-parse", "HEAD"]);
+    await writeFile(join(root, "src", "app.ts"), "export const app = 2;\n");
+    await git(root, ["add", "src/app.ts"]);
+    await git(root, ["commit", "-m", "update app"]);
+    const compare = await git(root, ["rev-parse", "HEAD"]);
+
+    const forward = await new GitService(root).diff({ base, compare });
+    const reverse = await new GitService(root).diff({ base: compare, compare: base });
+
+    expect(forward.files).toEqual([
+      expect.objectContaining({
+        path: "src/app.ts",
+        status: "modified",
+        hunks: [expect.stringContaining("-export const app = 1;\n+export const app = 2;")]
+      })
+    ]);
+    expect(reverse.files).toEqual([
+      expect.objectContaining({
+        path: "src/app.ts",
+        status: "modified",
+        hunks: [expect.stringContaining("-export const app = 2;\n+export const app = 1;")]
+      })
+    ]);
+  });
+
   test("validates path filters through repo-relative policy", async () => {
     const root = await createGitFixture();
 
@@ -87,5 +114,6 @@ async function createGitFixture() {
 }
 
 async function git(cwd: string, args: string[]) {
-  await execFileAsync("git", args, { cwd, env: { PATH: process.env.PATH ?? "" } });
+  const result = await execFileAsync("git", args, { cwd, env: { PATH: process.env.PATH ?? "" } });
+  return result.stdout.trim();
 }

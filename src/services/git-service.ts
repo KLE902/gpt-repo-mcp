@@ -45,7 +45,7 @@ export class GitService {
       args.push("--cached");
     }
     if (options.base && options.compare) {
-      args.push(`${options.base}...${options.compare}`);
+      args.push(options.base, options.compare);
     } else if (options.base) {
       args.push(options.base);
     }
