@@ -245,10 +245,13 @@ async function resolveCliCommand(name, runCommand, platform) {
 }
 
 export function selectCliCandidate(name, candidates) {
+  const packageEntry = candidates.find((value) =>
+    value.toLowerCase().endsWith(join("@anthropic-ai", "claude-code", "cli.js").toLowerCase())
+  );
   const commandShim = candidates.find((value) => /\.(cmd|bat)$/i.test(value));
   const executable = candidates.find((value) => value.toLowerCase().endsWith(".exe"));
   return name === "claude"
-    ? commandShim ?? executable ?? candidates[0]
+    ? packageEntry ?? commandShim ?? executable ?? candidates[0]
     : executable ?? commandShim ?? candidates[0];
 }
 
@@ -262,7 +265,12 @@ export function knownWindowsCliCandidates(name, platform = globalThis.process.pl
     candidates.push(join(userProfile, ".local", "bin", `${name}.exe`));
     candidates.push(join(userProfile, ".claude", "local", `${name}.exe`));
   }
-  if (appData) candidates.push(join(appData, "npm", `${name}.cmd`));
+  if (appData) {
+    candidates.push(join(appData, "npm", `${name}.cmd`));
+    if (name === "claude") {
+      candidates.push(join(appData, "npm", "node_modules", "@anthropic-ai", "claude-code", "cli.js"));
+    }
+  }
   if (localAppData) candidates.push(join(localAppData, "Programs", name, `${name}.exe`));
   return candidates;
 }
@@ -371,6 +379,10 @@ export function resolveExecutableInvocation(
   fileExists = existsSync,
   nodeExecutable = globalThis.process.execPath
 ) {
+  if (executable.toLowerCase().endsWith(join("@anthropic-ai", "claude-code", "cli.js").toLowerCase())) {
+    return { command: nodeExecutable, args: [executable, ...args] };
+  }
+
   if (platform !== "win32" || !/\.(cmd|bat)$/i.test(executable)) {
     return { command: executable, args };
   }

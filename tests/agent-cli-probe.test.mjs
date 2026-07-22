@@ -85,6 +85,7 @@ describe("agent-cli-probe", () => {
       "C:\\Users\\fixture\\.local\\bin\\claude.exe",
       "C:\\Users\\fixture\\.claude\\local\\claude.exe",
       "C:\\Users\\fixture\\AppData\\Roaming\\npm\\claude.cmd",
+      "C:\\Users\\fixture\\AppData\\Roaming\\npm\\node_modules\\@anthropic-ai\\claude-code\\cli.js",
       "C:\\Users\\fixture\\AppData\\Local\\Programs\\claude\\claude.exe"
     ]);
   });
@@ -92,10 +93,25 @@ describe("agent-cli-probe", () => {
   test("prefers the npm command shim for Claude and native executables for other providers", () => {
     const candidates = [
       "C:\\Users\\fixture\\.local\\bin\\claude.exe",
-      "C:\\Users\\fixture\\AppData\\Roaming\\npm\\claude.cmd"
+      "C:\\Users\\fixture\\AppData\\Roaming\\npm\\claude.cmd",
+      "C:\\Users\\fixture\\AppData\\Roaming\\npm\\node_modules\\@anthropic-ai\\claude-code\\cli.js"
     ];
-    expect(selectCliCandidate("claude", candidates)).toBe(candidates[1]);
+    expect(selectCliCandidate("claude", candidates)).toBe(candidates[2]);
     expect(selectCliCandidate("codex", candidates)).toBe(candidates[0]);
+  });
+
+  test("runs the Claude package entry directly through Node", () => {
+    const entry = "C:\\Users\\fixture\\AppData\\Roaming\\npm\\node_modules\\@anthropic-ai\\claude-code\\cli.js";
+    expect(resolveExecutableInvocation(
+      entry,
+      ["--version"],
+      "win32",
+      () => true,
+      "C:\\Program Files\\nodejs\\node.exe"
+    )).toEqual({
+      command: "C:\\Program Files\\nodejs\\node.exe",
+      args: [entry, "--version"]
+    });
   });
 
   test("runs the verified npm Claude entry through Node without cmd.exe quoting", () => {
