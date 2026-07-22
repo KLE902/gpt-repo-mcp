@@ -154,3 +154,7 @@ Use `npm run connect` as the fallback diagnostic path. It remains independent of
 The scheduled task starts the supervisor through a fixed PowerShell launcher with `-WindowStyle Hidden`. No persistent console window should remain open during normal supervised operation. Reinstall the current runtime build if an older task still starts `node.exe` interactively.
 
 `npm run runtime:status` reports the most recent MCP or tunnel exit when one exists. A restart counter that remains unchanged while the process is healthy is historical and does not by itself indicate an active restart loop.
+
+## No-console scheduled launcher
+
+The Windows scheduled task uses `wscript.exe` with the fixed `scripts/start-runtime-supervisor.vbs` launcher. Windows Script Host starts the Node.js supervisor with window style `0` and waits for it, so Task Scheduler continues to own the long-lived process without leaving a PowerShell or console window open. The previous PowerShell launcher remains only as a diagnostic fallback and is not used by the scheduled task.

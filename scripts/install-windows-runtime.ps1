@@ -16,7 +16,7 @@ if ([string]::IsNullOrWhiteSpace($RepoPath)) {
 }
 
 $supervisorPath = Join-Path $RepoPath "scripts\runtime-supervisor.mjs"
-$launcherPath = Join-Path $RepoPath "scripts\start-runtime-supervisor.ps1"
+$launcherPath = Join-Path $RepoPath "scripts\start-runtime-supervisor.vbs"
 $configPath = Join-Path $RepoPath "config.local.json"
 $serverPath = Join-Path $RepoPath "dist\server.js"
 
@@ -81,7 +81,10 @@ foreach ($required in @($supervisorPath, $launcherPath, $configPath, $serverPath
 
 $nodeCommand = Get-Command node.exe -ErrorAction Stop
 $nodePath = $nodeCommand.Source
-$powershellPath = (Get-Command powershell.exe -ErrorAction Stop).Source
+$wscriptPath = Join-Path $env:SystemRoot "System32\wscript.exe"
+if (-not (Test-Path -LiteralPath $wscriptPath -PathType Leaf)) {
+    throw "Windows Script Host is unavailable: $wscriptPath"
+}
 $npmCli = $env:npm_execpath
 if ([string]::IsNullOrWhiteSpace($npmCli) -or -not (Test-Path -LiteralPath $npmCli -PathType Leaf)) {
     throw "npm_execpath is unavailable. Run this installer through: npm run install:windows-runtime"
@@ -97,16 +100,14 @@ if ($null -ne $existingTask) {
 }
 
 $arguments = @(
-    "-NoProfile",
-    "-NonInteractive",
-    "-ExecutionPolicy", "Bypass",
-    "-WindowStyle", "Hidden",
-    "-File", ('"{0}"' -f $launcherPath),
-    "-RepoPath", ('"{0}"' -f $RepoPath),
-    "-NodePath", ('"{0}"' -f $nodePath),
-    "-NpmCli", ('"{0}"' -f $npmCli)
+    "//B",
+    "//NoLogo",
+    ('"{0}"' -f $launcherPath),
+    ('"{0}"' -f $RepoPath),
+    ('"{0}"' -f $nodePath),
+    ('"{0}"' -f $npmCli)
 ) -join " "
-$taskAction = New-ScheduledTaskAction -Execute $powershellPath -Argument $arguments -WorkingDirectory $RepoPath
+$taskAction = New-ScheduledTaskAction -Execute $wscriptPath -Argument $arguments -WorkingDirectory $RepoPath
 $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $identity
 $principal = New-ScheduledTaskPrincipal -UserId $identity -LogonType Interactive -RunLevel Limited
