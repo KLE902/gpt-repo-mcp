@@ -259,7 +259,7 @@ Closes one exact open, unmerged pull request only after explicit owner approval 
 
 ### `repo_branch_audit`
 
-Audits one exact local and/or `origin` branch without changing refs. It resolves the current remote base SHA, local and remote branch SHAs, merge base, ahead/behind counts, full ancestry into the base, and open GitHub pull requests using the branch. The result reports `safe_to_retire` only when the worktree is clean, the branch is not current or protected, local and remote refs agree, the branch is fully contained in the base, and no open PR uses it.
+Audits one exact local and/or `origin` branch without changing refs. It resolves the current remote base SHA, local and remote branch SHAs, merge base, ahead/behind counts, Git patch-equivalence, exact merged pull requests whose head SHA matches the branch, and open GitHub pull requests using the branch. The result reports `safe_to_retire` only when the worktree is clean, the branch is not current or protected, local and remote refs agree, at least one strict containment proof exists, and no open PR uses it.
 
 ### `repo_write_retire_branch`
 
