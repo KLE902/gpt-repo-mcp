@@ -10,6 +10,7 @@ import type {
   RemoteStatusInput,
   SyncBaseInput
 } from "../contracts/remote-git.contract.js";
+import type { PullRequestListInput, RetirePullRequestInput } from "../contracts/pull-retirement.contract.js";
 import type {
   BranchListInput,
   FinalizePullRequestInput,
@@ -19,6 +20,7 @@ import type {
 import { RepoReaderError, toRepoReaderError } from "../runtime/errors.js";
 import { redactSensitiveText } from "../runtime/result-envelope.js";
 import { GitHubClient, type GitHubCheckRun, type GitHubCombinedStatus, type GitHubPull } from "./github-client.js";
+import { GitHubCliService, type GitHubCliPull } from "./github-cli-service.js";
 import { OperationsPolicy } from "./operations-policy.js";
 
 const execFileAsync = promisify(execFile);
@@ -26,6 +28,7 @@ type GitRunner = (args: string[]) => Promise<string>;
 
 type RemoteGitServiceOptions = {
   git_runner?: GitRunner;
+  gh_runner?: GitRunner;
   fetch_impl?: typeof fetch;
   env?: NodeJS.ProcessEnv;
 };
@@ -35,6 +38,7 @@ type GitHubRepository = { owner: string; name: string; html_url: string };
 export class RemoteGitService {
   private readonly gitRunner: GitRunner;
   private readonly github: GitHubClient;
+  private readonly githubCli: GitHubCliService;
 
   constructor(
     private readonly root: string,
@@ -56,6 +60,7 @@ export class RemoteGitService {
       }
     });
     this.github = new GitHubClient({ fetch_impl: options.fetch_impl, env: options.env });
+    this.githubCli = new GitHubCliService(this.root, options.gh_runner);
   }
 
   async createBranch(input: CreateBranchInput) {
@@ -201,6 +206,104 @@ export class RemoteGitService {
       ...(checks ? { checks } : {}),
       warnings: unique(warnings)
     };
+  }
+
+  async pullRequests(input: PullRequestListInput) {
+    this.assertOrigin(input.remote);
+    const repository = await this.repositoryFor(input.remote);
+    if (input.head) await this.validateBranch(input.head);
+    if (input.base) await this.validateBranch(input.base);
+    const requested = await this.githubCli.listPulls(`${repository.owner}/${repository.name}`, {
+      state: input.state,
+      ...(input.head ? { head: input.head } : {}),
+      ...(input.base ? { base: input.base } : {}),
+      limit: input.limit + 1
+    });
+    const truncated = requested.length > input.limit;
+    const pulls = requested.slice(0, input.limit);
+    const mapped = [];
+    const warnings: string[] = [];
+    for (const pull of pulls) {
+      const item = mapGhPull(pull);
+      if (!input.include_checks) {
+        mapped.push(item);
+        continue;
+      }
+      const collected = await this.collectChecks(repository, item.head_sha);
+      warnings.push(...collected.warnings);
+      mapped.push({ ...item, checks: collected.summary });
+    }
+    return {
+      ok: true as const,
+      remote: input.remote,
+      repository,
+      state: input.state,
+      ...(input.head ? { head: input.head } : {}),
+      ...(input.base ? { base: input.base } : {}),
+      pull_requests: mapped,
+      truncated,
+      warnings: unique(warnings)
+    };
+  }
+
+  async retirePullRequest(input: RetirePullRequestInput) {
+    this.assertOrigin(input.remote);
+    this.policy.assertPullRequestAllowed();
+    if (input.delete_local_branch) this.policy.assertBranchManageAllowed();
+    if (input.delete_remote_branch) this.policy.assertPushAllowed();
+    const state = await this.localState(input.expected_head_sha);
+    this.assertClean(state.clean);
+    const repository = await this.repositoryFor(input.remote);
+    const repositorySlug = `${repository.owner}/${repository.name}`;
+    const mappedPull = mapGhPull(await this.githubCli.viewPull(repositorySlug, input.pull_number));
+    if (mappedPull.head_sha !== input.expected_pull_head_sha) {
+      throw new RepoReaderError("GITHUB_PR_HEAD_MISMATCH", "Pull request head changed after owner review; review the new head before retirement.", {
+        diagnostics: { expected_head_sha: input.expected_pull_head_sha, actual_head_sha: mappedPull.head_sha }
+      });
+    }
+    if (mappedPull.state !== "open" || mappedPull.merged) {
+      throw new RepoReaderError("GITHUB_PR_NOT_OPEN", "Pull request retirement requires an open, unmerged pull request.");
+    }
+    await this.validateBranch(mappedPull.head_ref);
+    await this.validateBranch(mappedPull.base_ref);
+    if (mappedPull.head_ref === mappedPull.base_ref || mappedPull.head_ref === "main" || mappedPull.head_ref === "master") {
+      throw new RepoReaderError("GITHUB_PR_BRANCH_UNSAFE", "Pull request head branch is not eligible for retirement cleanup.");
+    }
+    if (state.branch === mappedPull.head_ref) {
+      throw new RepoReaderError("GIT_BRANCH_CURRENT", "Switch away from the pull request head branch before retiring it.");
+    }
+    const openForHead = await this.githubCli.listPulls(repositorySlug, { state: "open", head: mappedPull.head_ref, limit: 100 });
+    const otherOpen = openForHead.filter((candidate) => candidate.number !== mappedPull.number);
+    if (otherOpen.length > 0) {
+      throw new RepoReaderError("GITHUB_PR_BRANCH_IN_USE", "Another open pull request uses the same head branch; retirement cleanup was blocked.", {
+        diagnostics: { pull_numbers: otherOpen.map((candidate) => candidate.number).join(",") }
+      });
+    }
+    const localFeatureSha = await this.tryGit(["rev-parse", `refs/heads/${mappedPull.head_ref}`]);
+    if (localFeatureSha && localFeatureSha !== input.expected_pull_head_sha) {
+      throw new RepoReaderError("GIT_HEAD_MISMATCH", "Local pull request branch no longer points to the approved retirement SHA.");
+    }
+    const remoteFeatureSha = await this.readRemoteHead(input.remote, mappedPull.head_ref);
+    if (remoteFeatureSha && remoteFeatureSha !== input.expected_pull_head_sha) {
+      throw new RepoReaderError("GIT_REMOTE_HEAD_MISMATCH", "Remote pull request branch no longer points to the approved retirement SHA.");
+    }
+    const initialWarnings = [
+      ...(input.delete_local_branch && !localFeatureSha ? ["LOCAL_BRANCH_ALREADY_ABSENT"] : []),
+      ...(input.delete_remote_branch && !remoteFeatureSha ? ["REMOTE_BRANCH_ALREADY_ABSENT"] : [])
+    ];
+    if (input.dry_run) {
+      return {
+        ok: true as const,
+        dry_run: true,
+        pull_request: mappedPull,
+        closed: false,
+        comment_added: false,
+        local_branch_deleted: false,
+        remote_branch_deleted: false,
+        warnings: initialWarnings
+      };
+    }
+    return this.completePullRetirement(input, repositorySlug, mappedPull, localFeatureSha, remoteFeatureSha, initialWarnings);
   }
 
   async push(input: PushInput) {
@@ -517,6 +620,58 @@ export class RemoteGitService {
     };
   }
 
+  private async completePullRetirement(
+    input: RetirePullRequestInput,
+    repositorySlug: string,
+    mappedPull: PullRequest,
+    localFeatureSha: string | undefined,
+    remoteFeatureSha: string | undefined,
+    initialWarnings: string[]
+  ) {
+    await this.githubCli.closePull(repositorySlug, mappedPull.number, input.comment);
+    const closedPull = mapGhPull(await this.githubCli.viewPull(repositorySlug, mappedPull.number));
+    if (closedPull.state !== "closed" || closedPull.merged || closedPull.head_sha !== input.expected_pull_head_sha) {
+      throw new RepoReaderError("GITHUB_PR_CLOSE_VERIFICATION_FAILED", "GitHub did not confirm the expected unmerged closed pull request state.");
+    }
+    const warnings = [...initialWarnings];
+    const remainingOpen = await this.githubCli.listPulls(repositorySlug, { state: "open", head: closedPull.head_ref, limit: 100 });
+    if (remainingOpen.length > 0) warnings.push("BRANCH_CLEANUP_SKIPPED_OPEN_PULL_REQUEST");
+    let localDeleted = false;
+    let remoteDeleted = false;
+    if (remainingOpen.length === 0 && input.delete_local_branch && localFeatureSha) {
+      try {
+        await this.runGit(["branch", "-D", closedPull.head_ref]);
+        if (await this.tryGit(["rev-parse", `refs/heads/${closedPull.head_ref}`])) {
+          throw new RepoReaderError("GIT_BRANCH_DELETE_FAILED", "Local retired branch still exists after deletion.");
+        }
+        localDeleted = true;
+      } catch (error) {
+        warnings.push(`LOCAL_BRANCH_DELETE_${toRepoReaderError(error).code}`);
+      }
+    }
+    if (remainingOpen.length === 0 && input.delete_remote_branch && remoteFeatureSha) {
+      try {
+        await this.runGit(["push", "--porcelain", input.remote, `:refs/heads/${closedPull.head_ref}`]);
+        if (await this.readRemoteHead(input.remote, closedPull.head_ref)) {
+          throw new RepoReaderError("GIT_BRANCH_DELETE_FAILED", "Remote retired branch still exists after deletion.");
+        }
+        remoteDeleted = true;
+      } catch (error) {
+        warnings.push(`REMOTE_BRANCH_DELETE_${toRepoReaderError(error).code}`);
+      }
+    }
+    return {
+      ok: true as const,
+      dry_run: false,
+      pull_request: closedPull,
+      closed: true,
+      comment_added: Boolean(input.comment),
+      local_branch_deleted: localDeleted,
+      remote_branch_deleted: remoteDeleted,
+      warnings: unique(warnings)
+    };
+  }
+
   private async performSync(remote: string, base: string, state: { branch: string; head: string; clean: boolean }, dryRun: boolean) {
     const remoteBaseSha = await this.readRemoteHead(remote, base);
     if (!remoteBaseSha) {
@@ -710,6 +865,29 @@ function mapPull(pull: GitHubPull): PullRequest {
     mergeable: pull.mergeable,
     mergeable_state: pull.mergeable_state,
     merged: pull.merged
+  };
+}
+
+function mapGhPull(pull: GitHubCliPull): PullRequest {
+  const mergeable = pull.mergeable.toUpperCase() === "MERGEABLE"
+    ? true
+    : pull.mergeable.toUpperCase() === "CONFLICTING"
+      ? false
+      : null;
+  const merged = Boolean(pull.mergedAt) || pull.state.toUpperCase() === "MERGED";
+  return {
+    number: pull.number,
+    title: pull.title,
+    state: pull.state.toUpperCase() === "OPEN" ? "open" : "closed",
+    draft: pull.isDraft,
+    html_url: pull.url,
+    head_ref: pull.headRefName,
+    head_sha: pull.headRefOid.toLowerCase(),
+    base_ref: pull.baseRefName,
+    base_sha: pull.baseRefOid.toLowerCase(),
+    mergeable,
+    mergeable_state: pull.mergeStateStatus.toLowerCase(),
+    merged
   };
 }
 

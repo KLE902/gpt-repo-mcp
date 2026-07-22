@@ -14,6 +14,7 @@ import {
   gitBranchesHandler,
   writeSwitchBranchHandler,
   remoteStatusHandler,
+  remotePullRequestsHandler,
   gitRestorePathsHandler,
   gitStageHandler,
   gitStatusHandler,
@@ -38,6 +39,7 @@ import {
   policyExplainHandler,
   writePushHandler,
   writePullRequestHandler,
+  writeRetirePullRequestHandler,
   writeFinalizePullRequestHandler,
   writeDispatchWorkflowHandler,
   runAllowedScriptHandler,
@@ -186,6 +188,15 @@ export const toolCatalog: ToolDefinition[] = [
     handler: remoteStatusHandler
   },
   {
+    name: "repo_remote_pull_requests",
+    title: "List GitHub pull requests",
+    description: descriptions.repo_remote_pull_requests,
+    inputSchema: toolContracts.repo_remote_pull_requests.input,
+    outputSchema: toolContracts.repo_remote_pull_requests.output,
+    annotations: remoteReadAnnotations,
+    handler: remotePullRequestsHandler
+  },
+  {
     name: "repo_write_push",
     title: "Push reviewed branch",
     description: descriptions.repo_write_push,
@@ -202,6 +213,15 @@ export const toolCatalog: ToolDefinition[] = [
     outputSchema: toolContracts.repo_write_pull_request.output,
     annotations: remoteWriteAnnotations,
     handler: writePullRequestHandler
+  },
+  {
+    name: "repo_write_retire_pull_request",
+    title: "Retire pull request",
+    description: descriptions.repo_write_retire_pull_request,
+    inputSchema: toolContracts.repo_write_retire_pull_request.input,
+    outputSchema: toolContracts.repo_write_retire_pull_request.output,
+    annotations: remoteWriteAnnotations,
+    handler: writeRetirePullRequestHandler
   },
   {
     name: "repo_write_finalize_pull_request",

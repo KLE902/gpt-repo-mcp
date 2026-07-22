@@ -27,10 +27,14 @@ export const descriptions = {
     "Use this when a clean worktree must switch to an existing local branch with exact current branch and HEAD guards. It never creates, resets, rebases, or deletes a branch.",
   repo_remote_status:
     "Use this when the user asks whether a branch is pushed, whether a pull request exists, or whether GitHub checks have passed. Reads the configured GitHub remote and API without mutating local or remote state.",
+  repo_remote_pull_requests:
+    "Use this when the user asks to list, audit, find, or filter GitHub pull requests for an approved repository. Uses fixed GitHub CLI arguments, returns bounded structured results, and never mutates GitHub or Git refs.",
   repo_write_push:
     "Use this when a reviewed local commit is ready for the routine next step in an authorized delivery workflow. No separate conversational approval is required for pushing the exact current feature branch and HEAD. Requires remote opt-in, a clean worktree, exact branch and HEAD guards, uses fixed git arguments, never force-pushes, and refuses direct push to main or master.",
   repo_write_pull_request:
     "Use this when the exact current branch has been pushed and its GitHub pull request should be created or updated as the routine next step in an authorized delivery workflow. No separate conversational approval is required. Requires remote opt-in, exact branch and HEAD guards, a GitHub remote, and runtime GitHub authentication for mutations.",
+  repo_write_retire_pull_request:
+    "Use this when the owner explicitly approves closing an exact open unmerged GitHub pull request as superseded or abandoned. Requires exact local and pull-request HEAD guards, uses fixed GitHub CLI close arguments, and may delete only the exact verified local and origin head branch after confirming no other open pull request uses it.",
   repo_write_finalize_pull_request:
     "Use this when GitHub confirms an exact pull request was merged and the owner approved cleanup. Fast-forwards the base, switches to it, and deletes only the verified local and optional origin feature branch.",
   repo_write_dispatch_workflow:
