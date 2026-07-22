@@ -1,7 +1,7 @@
 import { execFile, spawn } from "node:child_process";
 import { Buffer } from "node:buffer";
 import { existsSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const SHA_PATTERN = /^[a-f0-9]{40}$/i;
@@ -288,9 +288,7 @@ function assertCommandSucceeded(result, code, message) {
 function executeCommand(executable, args, options = {}) {
   return new Promise((resolveCommand) => {
     const platform = options.platform ?? globalThis.process.platform;
-    const invocation = platform === "win32" && /\.(cmd|bat)$/i.test(executable)
-      ? windowsCommandInvocation(executable, args)
-      : { command: executable, args };
+    const invocation = resolveExecutableInvocation(executable, args, platform);
     const maxOutputBytes = options.maxOutputBytes ?? 1_048_576;
     let stdout = "";
     let stderr = "";
@@ -358,6 +356,27 @@ function executeCommand(executable, args, options = {}) {
     if (options.input !== undefined) child.stdin?.end(String(options.input));
     else child.stdin?.end();
   });
+}
+
+export function resolveExecutableInvocation(
+  executable,
+  args,
+  platform = globalThis.process.platform,
+  fileExists = existsSync,
+  nodeExecutable = globalThis.process.execPath
+) {
+  if (platform !== "win32" || !/\.(cmd|bat)$/i.test(executable)) {
+    return { command: executable, args };
+  }
+
+  if (basename(executable).toLowerCase() === "claude.cmd") {
+    const cliEntry = join(dirname(executable), "node_modules", "@anthropic-ai", "claude-code", "cli.js");
+    if (fileExists(cliEntry)) {
+      return { command: nodeExecutable, args: [cliEntry, ...args] };
+    }
+  }
+
+  return windowsCommandInvocation(executable, args);
 }
 
 function windowsCommandInvocation(executable, args) {

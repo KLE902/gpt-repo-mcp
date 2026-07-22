@@ -4,6 +4,7 @@ import {
   detectCapabilities,
   knownWindowsCliCandidates,
   probeAgentCli,
+  resolveExecutableInvocation,
   validateProbeOutput
 } from "../scripts/agent-cli-probe.mjs";
 
@@ -85,6 +86,23 @@ describe("agent-cli-probe", () => {
       "C:\\Users\\fixture\\AppData\\Roaming\\npm\\claude.cmd",
       "C:\\Users\\fixture\\AppData\\Local\\Programs\\claude\\claude.exe"
     ]);
+  });
+
+  test("runs the verified npm Claude entry through Node without cmd.exe quoting", () => {
+    const executable = "C:\\Users\\fixture\\AppData\\Roaming\\npm\\claude.cmd";
+    expect(resolveExecutableInvocation(
+      executable,
+      ["--version"],
+      "win32",
+      (path) => path.endsWith("\\npm\\node_modules\\@anthropic-ai\\claude-code\\cli.js"),
+      "C:\\Program Files\\nodejs\\node.exe"
+    )).toEqual({
+      command: "C:\\Program Files\\nodejs\\node.exe",
+      args: [
+        "C:\\Users\\fixture\\AppData\\Roaming\\npm\\node_modules\\@anthropic-ai\\claude-code\\cli.js",
+        "--version"
+      ]
+    });
   });
 
   test("runs a complete Codex probe and verifies unchanged Git state", async () => {
