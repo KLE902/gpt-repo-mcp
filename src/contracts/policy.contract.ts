@@ -34,7 +34,7 @@ export const PolicyExplainResultSchema = z.object({
     github_workflow_dispatch_enabled: z.boolean().describe("Whether GitHub Actions workflow dispatch is enabled."),
     allowed_workflow_ids: z.array(z.string()).describe("Locally allowlisted workflow identifiers available for dispatch."),
     github_merge_enabled: z.boolean().describe("Whether owner-approved GitHub pull request merge operations are enabled."),
-    git_sync_enabled: z.boolean().describe("Whether fast-forward synchronization of a local base branch is enabled."),
+    git_sync_enabled: z.boolean().describe("Whether guarded Git synchronization is enabled, including fast-forward base sync and conflict-preflighted feature-branch updates."),
     script_run_enabled: z.boolean().describe("Whether configured allowlisted scripts may run."),
     allowed_script_ids: z.array(z.string()).describe("Configured script ids available to the model; commands and arguments are not supplied by the model."),
     cleanup_enabled: z.boolean().describe("Whether local cleanup operations are enabled."),

@@ -291,6 +291,14 @@ For another approved repository, configure `node` with an absolute local path to
 
 Synchronizes a local base branch with `origin` without switching branches. If the base is checked out it uses `pull --ff-only`; otherwise it fetches an explicit base refspec. No rebase, reset, or force update is available.
 
+### `repo_write_update_branch_from_base`
+
+Updates the exact currently checked-out feature branch from an explicit current `origin` base SHA. The worktree and index must be clean, the current feature branch and HEAD must match the supplied guards, the remote base must still match `expected_base_sha`, and `main`/`master` cannot be the feature branch.
+
+The tool fetches the exact base commit without updating local branch refs, computes ancestry, and uses `git merge-tree --write-tree --name-only` to preflight a diverged branch. Conflicts are returned as bounded structured paths with `action: "conflicts"`; no merge is started. A conflict-free update uses only `git merge --ff-only` or `git merge --no-ff` with fixed arguments. It never rebases, cherry-picks, pushes, force-updates, or accepts caller-supplied Git arguments. An unexpected merge failure is aborted and the original HEAD, clean worktree, and absence of `MERGE_HEAD` are verified before an error is returned.
+
+`dry_run` still fetches the exact base object for truthful preflight but does not change the feature branch, index, or worktree.
+
 ### `repo_write_merge_pull_request`
 
 Merges a specific GitHub PR only when `owner_approved` is literally true and the current PR head matches `expected_pull_head_sha`. Known checks must pass by default. The response reports GitHub merge success separately from the optional best-effort local base sync.

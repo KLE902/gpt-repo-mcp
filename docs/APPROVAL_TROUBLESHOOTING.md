@@ -20,6 +20,7 @@ Use this checklist when a mutating tool dry-run succeeds but the actual tool cal
   - `repo_write_push`
   - `repo_write_pull_request`
   - `repo_write_sync_base`
+  - `repo_write_update_branch_from_base`
   - `repo_write_merge_pull_request`
   - compatibility aliases:
   - `repo_git_stage`

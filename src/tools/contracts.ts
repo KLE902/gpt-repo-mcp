@@ -1,3 +1,4 @@
+import { BranchUpdateInputSchema, BranchUpdateResultSchema } from "../contracts/branch-update.contract.js";
 import type { z } from "zod";
 import { AllowedScriptInputSchema, AllowedScriptResultSchema, BranchListInputSchema, BranchListResultSchema, FinalizePullRequestInputSchema, FinalizePullRequestResultSchema, SwitchBranchInputSchema, SwitchBranchResultSchema, WorkflowDispatchInputSchema, WorkflowDispatchResultSchema } from "../contracts/autonomous-operations.contract.js";
 import { ChangePlanInputSchema, ChangePlanResultSchema } from "../contracts/change-plan.contract.js";
@@ -45,6 +46,7 @@ export type ToolName =
   | "repo_write_dispatch_workflow"
   | "repo_run_allowed_script"
   | "repo_write_sync_base"
+  | "repo_write_update_branch_from_base"
   | "repo_write_merge_pull_request"
   | "repo_git_stage"
   | "repo_git_unstage"
@@ -162,6 +164,10 @@ export const toolContracts = {
   repo_write_sync_base: {
     input: SyncBaseInputSchema,
     output: SyncBaseResultSchema
+  },
+  repo_write_update_branch_from_base: {
+    input: BranchUpdateInputSchema,
+    output: BranchUpdateResultSchema
   },
   repo_write_merge_pull_request: {
     input: MergePullRequestInputSchema,

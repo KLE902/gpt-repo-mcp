@@ -24,6 +24,7 @@ export const MUTATING_TOOL_NAMES = [
   "repo_write_dispatch_workflow",
   "repo_run_allowed_script",
   "repo_write_sync_base",
+  "repo_write_update_branch_from_base",
   "repo_write_merge_pull_request"
 ] as const satisfies readonly ToolName[];
 

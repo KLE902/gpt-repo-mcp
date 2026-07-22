@@ -26,6 +26,7 @@ import { WritePolicy } from "../services/write-policy.js";
 import { OperationReceiptService } from "../services/operation-receipt-service.js";
 import { RemoteGitService } from "../services/remote-git-service.js";
 import { AllowedScriptService } from "../services/allowed-script-service.js";
+import { BranchUpdateService } from "../services/branch-update-service.js";
 import { createErrorEnvelope, createSuccessEnvelope } from "../runtime/result-envelope.js";
 import { toRepoReaderError } from "../runtime/errors.js";
 import { audit } from "../runtime/telemetry.js";
@@ -48,6 +49,7 @@ import type { GitReviewInput } from "../contracts/git-review.contract.js";
 import type { CleanupPathsInput } from "../contracts/cleanup.contract.js";
 import type { HandoffInput } from "../contracts/handoff.contract.js";
 import type { CreateBranchInput, MergePullRequestInput, PullRequestInput, PushInput, RemoteStatusInput, SyncBaseInput } from "../contracts/remote-git.contract.js";
+import type { BranchUpdateInput } from "../contracts/branch-update.contract.js";
 import type { AllowedScriptInput, BranchListInput, FinalizePullRequestInput, SwitchBranchInput, WorkflowDispatchInput } from "../contracts/autonomous-operations.contract.js";
 
 type RepoInput = { repo_id: string };
@@ -231,6 +233,20 @@ export const writeSyncBaseHandler: ToolHandler = async (input, context) => safeT
   const result = await new RemoteGitService(repo.root, new OperationsPolicy(repo.operations)).syncBase(args);
   audit({ tool: "repo_write_sync_base", repo_id: args.repo_id, warnings: result.warnings });
   return createSuccessEnvelope(result, result.dry_run ? `Dry run validated synchronization of ${result.base}.` : `Synchronized local ${result.base} with ${result.remote}/${result.base}.`, { warnings: result.warnings });
+});
+
+export const writeUpdateBranchFromBaseHandler: ToolHandler = async (input, context) => safeTool<BranchUpdateInput>("repo_write_update_branch_from_base", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await new BranchUpdateService(repo.root, new OperationsPolicy(repo.operations)).update(args);
+  audit({ tool: "repo_write_update_branch_from_base", repo_id: args.repo_id, paths: result.conflict_files, warnings: result.warnings });
+  const message = result.action === "conflicts"
+    ? `Branch update preflight found ${result.conflict_files.length} conflicted files.`
+    : result.action === "up_to_date"
+      ? `${result.feature_branch} already contains ${result.remote}/${result.base}.`
+      : result.dry_run
+        ? `Dry run validated ${result.action} update of ${result.feature_branch} from ${result.remote}/${result.base}.`
+        : `Updated ${result.feature_branch} from ${result.remote}/${result.base} by ${result.action}.`;
+  return createSuccessEnvelope(result, message, { warnings: result.warnings });
 });
 
 export const writeMergePullRequestHandler: ToolHandler = async (input, context) => safeTool<MergePullRequestInput>("repo_write_merge_pull_request", input, context, async (args) => {

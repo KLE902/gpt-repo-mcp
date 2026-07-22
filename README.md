@@ -107,7 +107,7 @@ No mode enables arbitrary shell or Git execution, force-push, direct push to `ma
 4. Create or update its GitHub pull request with `repo_write_pull_request`.
 5. Inspect one PR and its checks with `repo_remote_status`, or audit bounded PR sets with `repo_remote_pull_requests`. Draft-ready uses the fixed GitHub CLI wrapper. An explicitly owner-approved open, unmerged PR can be closed and its exact verified head branch retired with `repo_write_retire_pull_request`.
 6. Merge only after explicit owner approval with `repo_write_merge_pull_request`; the exact reviewed PR head SHA is mandatory and checks must pass by default.
-7. After merge, use `repo_write_finalize_pull_request` to synchronize and switch to the base, then delete only the verified merged feature branch locally and optionally on `origin`. Use `repo_write_sync_base` when cleanup is not intended.
+7. After merge, use `repo_write_finalize_pull_request` to synchronize and switch to the base, then delete only the verified merged feature branch locally and optionally on `origin`. Use `repo_write_sync_base` when cleanup is not intended. When an open feature branch has fallen behind its base, use `repo_write_update_branch_from_base` with exact feature/base SHA guards; it preflights conflicts without entering merge state and performs only a fixed fast-forward or merge.
 
 All remote tools are restricted to the configured `origin` on GitHub.com. Push never uses force and refuses `main` or `master`. GitHub API mutations use `GPT_REPO_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN` from the MCP server environment; when none is set, the standard startup scripts reuse the authenticated GitHub CLI session through `gh auth token` without printing or persisting it. Git push authentication uses the machine's configured credential manager or SSH agent.
 
@@ -162,7 +162,7 @@ Codex is done. Review the Codex result and the git diff for <repo_id>.
 | File writes | `repo_write_file`, `repo_write_changes` |
 | ChatGPT session continuity | `repo_write_handoff`, `repo_last_write` |
 | Local ship flow | `repo_write_create_branch`, `repo_git_branches`, `repo_write_switch_branch`, `repo_write_stage`, `repo_write_unstage`, `repo_write_commit`, `repo_write_stage_commit`, `repo_write_recover`, `repo_cleanup_paths`, `repo_run_allowed_script` |
-| GitHub remote flow | `repo_remote_status`, `repo_remote_pull_requests`, `repo_write_push`, `repo_write_pull_request`, `repo_write_retire_pull_request`, `repo_write_merge_pull_request`, `repo_write_finalize_pull_request`, `repo_write_sync_base`, `repo_write_dispatch_workflow` |
+| GitHub remote flow | `repo_remote_status`, `repo_remote_pull_requests`, `repo_write_push`, `repo_write_pull_request`, `repo_write_retire_pull_request`, `repo_write_merge_pull_request`, `repo_write_finalize_pull_request`, `repo_write_sync_base`, `repo_write_update_branch_from_base`, `repo_write_dispatch_workflow` |
 | Compatibility aliases | `repo_git_stage`, `repo_git_unstage`, `repo_git_commit` |
 | Codex/Claude coordination | `repo_prepare_codex_task`, `repo_write_codex_task`, `repo_codex_review` |
 
