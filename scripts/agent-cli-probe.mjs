@@ -1,6 +1,7 @@
 import { execFile, spawn } from "node:child_process";
 import { Buffer } from "node:buffer";
-import { basename, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const SHA_PATTERN = /^[a-f0-9]{40}$/i;
@@ -218,17 +219,46 @@ async function readGitState(cwd, runCommand) {
 async function resolveCliCommand(name, runCommand, platform) {
   const locator = platform === "win32" ? "where.exe" : "which";
   const result = await runCommand(locator, [name], { timeoutMs: 10_000, maxOutputBytes: 65_536 });
-  assertCommandSucceeded(result, "CLI_NOT_FOUND", `Could not locate ${name} on PATH.`);
-  const candidates = String(result.stdout ?? "")
-    .split(/\r?\n/)
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .filter((value) => !value.toLowerCase().endsWith(".ps1"));
+  if (result?.timedOut || result?.truncated || result?.complete === false) {
+    assertCommandSucceeded(result, "CLI_NOT_FOUND", `Could not locate ${name} on PATH.`);
+  }
+
+  const candidates = result?.exitCode === 0
+    ? String(result.stdout ?? "")
+      .split(/\r?\n/)
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .filter((value) => !value.toLowerCase().endsWith(".ps1"))
+    : [];
+
+  for (const path of knownWindowsCliCandidates(name, platform, globalThis.process.env)) {
+    if (existsSync(path) && !candidates.includes(path)) candidates.push(path);
+  }
+
   const candidate = candidates.find((value) => value.toLowerCase().endsWith(".exe"))
     ?? candidates.find((value) => /\.(cmd|bat)$/i.test(value))
     ?? candidates[0];
-  if (!candidate) throw operationError("CLI_NOT_FOUND", `Could not locate ${name} on PATH.`);
+  if (!candidate) {
+    throw operationError("CLI_NOT_FOUND", `Could not locate ${name} on PATH or in supported Windows install locations.`, {
+      locator_exit_code: result?.exitCode ?? null
+    });
+  }
   return candidate;
+}
+
+export function knownWindowsCliCandidates(name, platform = globalThis.process.platform, env = globalThis.process.env) {
+  if (platform !== "win32") return [];
+  const userProfile = String(env.USERPROFILE ?? "").trim();
+  const appData = String(env.APPDATA ?? "").trim();
+  const localAppData = String(env.LOCALAPPDATA ?? "").trim();
+  const candidates = [];
+  if (userProfile) {
+    candidates.push(join(userProfile, ".local", "bin", `${name}.exe`));
+    candidates.push(join(userProfile, ".claude", "local", `${name}.exe`));
+  }
+  if (appData) candidates.push(join(appData, "npm", `${name}.cmd`));
+  if (localAppData) candidates.push(join(localAppData, "Programs", name, `${name}.exe`));
+  return candidates;
 }
 
 function requireCapabilities(provider, capabilities, required) {

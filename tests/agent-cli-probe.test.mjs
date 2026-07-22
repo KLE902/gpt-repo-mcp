@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   buildProbeInvocation,
   detectCapabilities,
+  knownWindowsCliCandidates,
   probeAgentCli,
   validateProbeOutput
 } from "../scripts/agent-cli-probe.mjs";
@@ -70,6 +71,19 @@ describe("agent-cli-probe", () => {
       "--permission-mode", "plan",
       "--disallowedTools", "Bash,Edit,Write,NotebookEdit",
       "--no-session-persistence"
+    ]);
+  });
+
+  test("enumerates bounded Windows fallback locations without scanning the filesystem", () => {
+    expect(knownWindowsCliCandidates("claude", "win32", {
+      USERPROFILE: "C:\\Users\\fixture",
+      APPDATA: "C:\\Users\\fixture\\AppData\\Roaming",
+      LOCALAPPDATA: "C:\\Users\\fixture\\AppData\\Local"
+    })).toEqual([
+      "C:\\Users\\fixture\\.local\\bin\\claude.exe",
+      "C:\\Users\\fixture\\.claude\\local\\claude.exe",
+      "C:\\Users\\fixture\\AppData\\Roaming\\npm\\claude.cmd",
+      "C:\\Users\\fixture\\AppData\\Local\\Programs\\claude\\claude.exe"
     ]);
   });
 
