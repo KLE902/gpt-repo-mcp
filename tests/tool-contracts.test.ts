@@ -819,13 +819,13 @@ describe("tool catalog contracts", () => {
         name: "repo_branch_audit",
         annotations: remoteReadAnnotations,
         inputKeys: ["base", "branch", "remote", "repo_id"],
-        outputKeys: ["ahead", "base", "base_sha", "behind", "branch", "branch_sha", "clean", "current_branch", "head_sha", "local_branch_sha", "merge_base_sha", "merged_into_base", "ok", "open_pull_requests", "remote", "remote_branch_sha", "safe_to_retire", "warnings"]
+        outputKeys: ["ahead", "base", "base_sha", "behind", "branch", "branch_sha", "clean", "current_branch", "head_sha", "local_branch_sha", "merge_base_sha", "merged_into_base", "merged_pull_requests", "ok", "open_pull_requests", "patch_equivalent_to_base", "remote", "remote_branch_sha", "retirement_evidence", "safe_to_retire", "unique_patch_commits", "warnings"]
       },
       {
         name: "repo_write_retire_branch",
         annotations: remoteWriteAnnotations,
         inputKeys: ["base", "branch", "delete_local_branch", "delete_remote_branch", "dry_run", "expected_base_sha", "expected_branch_sha", "expected_head_sha", "owner_approved", "reason", "remote", "repo_id"],
-        outputKeys: ["ahead", "base", "base_sha", "behind", "branch", "branch_sha", "dry_run", "local_branch_deleted", "ok", "remote", "remote_branch_deleted", "warnings"]
+        outputKeys: ["ahead", "base", "base_sha", "behind", "branch", "branch_sha", "dry_run", "local_branch_deleted", "ok", "remote", "remote_branch_deleted", "retirement_evidence", "warnings"]
       }
     ]);
   });

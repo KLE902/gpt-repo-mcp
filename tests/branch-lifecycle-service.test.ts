@@ -40,6 +40,10 @@ describe("branch lifecycle", () => {
       ahead: 0,
       behind: 3,
       merged_into_base: true,
+      patch_equivalent_to_base: false,
+      unique_patch_commits: [],
+      merged_pull_requests: [],
+      retirement_evidence: "ancestry",
       open_pull_requests: [],
       safe_to_retire: true,
       warnings: []
@@ -61,6 +65,41 @@ describe("branch lifecycle", () => {
     expect(result.warnings).toContain("BRANCH_REF_DIVERGED");
     expect(result.local_branch_sha).toBe(BRANCH);
     expect(result.remote_branch_sha).toBe(remoteBranch);
+  });
+
+  test("accepts branch-only commits when every patch is already present in the base", async () => {
+    const first = "5".repeat(40);
+    const second = "6".repeat(40);
+    const service = createService({ merged: false, ahead: 2, cherry: `- ${first}\n- ${second}\n` });
+
+    const result = await service.auditBranch({ repo_id: "fixture", remote: "origin", branch: "feature/old", base: "main" });
+
+    expect(result).toMatchObject({
+      merged_into_base: false,
+      patch_equivalent_to_base: true,
+      unique_patch_commits: [],
+      merged_pull_requests: [],
+      retirement_evidence: "patch_equivalent",
+      safe_to_retire: true
+    });
+    expect(result.warnings).toContain("BRANCH_PATCH_EQUIVALENT_TO_BASE");
+  });
+
+  test("accepts a squash-merged branch only when a merged PR targets the base with the exact head SHA", async () => {
+    const unique = "7".repeat(40);
+    const service = createService({ merged: false, ahead: 2, cherry: `+ ${unique}\n`, mergedPull: true });
+
+    const result = await service.auditBranch({ repo_id: "fixture", remote: "origin", branch: "feature/old", base: "main" });
+
+    expect(result).toMatchObject({
+      merged_into_base: false,
+      patch_equivalent_to_base: false,
+      unique_patch_commits: [unique],
+      retirement_evidence: "merged_pull_request",
+      safe_to_retire: true,
+      merged_pull_requests: [{ number: 4, head_sha: BRANCH, base_ref: "main", merged: true }]
+    });
+    expect(result.warnings).toContain("BRANCH_HEAD_MERGED_BY_PULL_REQUEST");
   });
 
   test("deletes only exact verified local and origin refs after all guards pass", async () => {
@@ -98,6 +137,7 @@ describe("branch lifecycle", () => {
       ahead: 0,
       behind: 3,
       local_branch_deleted: true,
+      retirement_evidence: "ancestry",
       remote_branch_deleted: true,
       warnings: []
     });
@@ -106,7 +146,7 @@ describe("branch lifecycle", () => {
   });
 
   test("blocks retirement when the branch has commits not contained in the base", async () => {
-    const service = createService({ merged: false, ahead: 1, behind: 3 });
+    const service = createService({ merged: false, ahead: 1, behind: 3, cherry: `+ ${"8".repeat(40)}\n` });
 
     await expect(service.retireBranch({
       repo_id: "fixture",
@@ -129,6 +169,8 @@ type ServiceOptions = {
   merged?: boolean;
   ahead?: number;
   behind?: number;
+  cherry?: string;
+  mergedPull?: boolean;
   calls?: string[][];
   localExists?: () => boolean;
   remoteExists?: () => boolean;
@@ -168,6 +210,7 @@ function createService(options: ServiceOptions = {}): RemoteGitService {
         if (!merged) throw new Error("not ancestor");
         return "";
       }
+      if (command === `cherry ${BASE} ${BRANCH}`) return options.cherry ?? "";
       if (command === "branch -D feature/old") {
         options.deleteLocal?.();
         return "Deleted branch feature/old";
@@ -179,7 +222,25 @@ function createService(options: ServiceOptions = {}): RemoteGitService {
       throw new Error(`Unexpected git call: ${command}`);
     },
     gh_runner: async (args) => {
-      if (args.includes("pr") && args.includes("list")) return "[]";
+      if (args.includes("pr") && args.includes("list") && args.includes("open")) return "[]";
+      if (args.includes("pr") && args.includes("list") && args.includes("closed")) {
+        if (!options.mergedPull) return "[]";
+        return JSON.stringify([{
+          number: 4,
+          title: "Squash merged branch",
+          state: "MERGED",
+          isDraft: false,
+          url: "https://github.com/acme/demo/pull/4",
+          headRefName: "feature/old-original",
+          headRefOid: BRANCH,
+          baseRefName: "main",
+          baseRefOid: BASE,
+          mergeable: "UNKNOWN",
+          mergeStateStatus: "UNKNOWN",
+          mergedAt: "2026-07-22T10:00:00Z",
+          body: null
+        }]);
+      }
       throw new Error(`Unexpected gh call: ${args.join(" ")}`);
     }
   });

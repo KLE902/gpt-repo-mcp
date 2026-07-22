@@ -5,6 +5,7 @@ import { PullRequestSchema } from "./remote-git.contract.js";
 const ShaSchema = z.string().regex(/^[a-f0-9]{40}$/i).describe("Exact 40-character Git commit SHA used as a stale-state guard.");
 const BranchNameSchema = z.string().min(1).max(255).describe("Exact Git branch name, validated again with git check-ref-format.");
 const RemoteNameSchema = z.string().min(1).max(64).regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/).describe("Configured Git remote name, restricted to origin.");
+const RetirementEvidenceSchema = z.enum(["ancestry", "patch_equivalent", "merged_pull_request", "none"]);
 
 export const BranchAuditInputSchema = RepoInputSchema.extend({
   remote: RemoteNameSchema.optional().default("origin").describe("Configured Git remote whose branch refs and GitHub pull requests should be inspected."),
@@ -28,8 +29,12 @@ export const BranchAuditResultSchema = z.object({
   ahead: z.number().int().nonnegative().describe("Commits reachable only from the audited branch relative to the remote base."),
   behind: z.number().int().nonnegative().describe("Commits reachable only from the remote base relative to the audited branch."),
   merged_into_base: z.boolean().describe("Whether the audited branch commit is an ancestor of the current remote base."),
+  patch_equivalent_to_base: z.boolean().describe("Whether every branch-only commit has a patch-equivalent commit in the current remote base."),
+  unique_patch_commits: z.array(ShaSchema).describe("Branch-only commit SHAs whose patches are not present in the current remote base."),
+  merged_pull_requests: z.array(PullRequestSchema).describe("Merged pull requests targeting the selected base whose exact head SHA matches the audited branch SHA."),
+  retirement_evidence: RetirementEvidenceSchema.describe("Strict proof used for retirement: ancestry, patch-equivalent commits, an exact merged pull-request head, or none."),
   open_pull_requests: z.array(PullRequestSchema).describe("Open GitHub pull requests whose head is the audited branch."),
-  safe_to_retire: z.boolean().describe("Whether all bounded safety checks currently allow exact branch retirement."),
+  safe_to_retire: z.boolean().describe("Whether all bounded safety checks and one strict containment proof currently allow exact branch retirement."),
   warnings: z.array(z.string()).describe("Stable non-fatal warning codes explaining absent refs or failed safety conditions.")
 });
 
@@ -57,6 +62,7 @@ export const RetireBranchResultSchema = z.object({
   base_sha: ShaSchema.describe("Exact remote base SHA verified before retirement."),
   ahead: z.number().int().nonnegative().describe("Branch-only commit count verified before retirement."),
   behind: z.number().int().nonnegative().describe("Base-only commit count verified before retirement."),
+  retirement_evidence: RetirementEvidenceSchema.exclude(["none"]).describe("Strict containment proof that authorized retirement."),
   local_branch_deleted: z.boolean().describe("Whether the exact local branch ref was deleted."),
   remote_branch_deleted: z.boolean().describe("Whether the exact origin branch ref was deleted."),
   warnings: z.array(z.string()).describe("Stable non-fatal warning codes from branch retirement.")

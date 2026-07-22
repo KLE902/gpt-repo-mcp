@@ -24,9 +24,9 @@ export const descriptions = {
   repo_git_branches:
     "Use this when current, local, or origin branch names and SHAs must be inspected before switching or post-merge cleanup. Read-only and never changes refs.",
   repo_branch_audit:
-    "Use this when a local or origin branch must be evaluated before cleanup. Reports exact refs, remote-base ancestry, ahead/behind counts, merge base, open pull requests, and whether the branch is currently safe to retire without changing refs.",
+    "Use this when a local or origin branch must be evaluated before cleanup. Reports exact refs, remote-base ancestry, patch-equivalence, exact merged pull-request evidence, ahead/behind counts, open pull requests, and whether the branch is currently safe to retire without changing refs.",
   repo_write_retire_branch:
-    "Use this when the owner approved retiring an exact standalone branch after repo_branch_audit. Requires exact repository, branch, and base SHAs, a clean worktree, full ancestry in the base, no open pull request, and deletes only the verified local and optional origin refs.",
+    "Use this when the owner approved retiring an exact standalone branch after repo_branch_audit. Requires exact repository, branch, and base SHAs, a clean worktree, one strict containment proof, no open pull request, and deletes only the verified local and optional origin refs.",
   repo_write_switch_branch:
     "Use this when a clean worktree must switch to an existing local branch with exact current branch and HEAD guards. It never creates, resets, rebases, or deletes a branch.",
   repo_remote_status:
