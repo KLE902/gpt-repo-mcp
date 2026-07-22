@@ -1,6 +1,6 @@
 # Connection Options
 
-ChatGPT cannot call a local `localhost` MCP server directly. GPT Repo MCP supports three connection paths:
+ChatGPT cannot call a local `localhost` MCP server directly. GPT Repo MCP supports three transport paths plus an optional supervised Windows lifecycle:
 
 - built-in quickstart with `npm run connect`
 - manual local server plus your own HTTPS tunnel or reverse proxy
@@ -40,6 +40,18 @@ npm run install:desktop-launcher
 ```
 
 It creates `Start GPT Repo MCP.cmd` on the current user's Desktop. Double-click that file after Windows starts and keep its window open while ChatGPT uses the connector. Rerun with `npm run install:desktop-launcher -- -Force` to replace an existing launcher.
+
+## Supervised Windows lifecycle
+
+After the built-in ngrok connector is working, install the optional current-user supervisor:
+
+```powershell
+npm run install:windows-runtime
+```
+
+The supervisor starts at Windows sign-in, runs the compiled MCP server, reuses or starts ngrok, and restarts either child independently after failure. Its fixed restart control lets an allowlisted ChatGPT workflow reload MCP after a verified build without accepting command text or shell arguments. Normal MCP reload leaves ngrok running, which avoids an unnecessary public endpoint change.
+
+See [WINDOWS_RUNTIME.md](WINDOWS_RUNTIME.md) for installation, security, operations, and recovery.
 
 ## Manual Tunnel Provider
 
@@ -100,4 +112,5 @@ In ChatGPT connector settings, choose Tunnel as the connection type and select o
 - URL is rejected: confirm it starts with `https://` and includes `/t/<token>/mcp`.
 - Manual tunnel returns 404: confirm the server was started with `GPT_REPO_PUBLIC_PATH_TOKEN` and the connector URL uses the same token.
 - Secure Tunnel connector cannot discover tools: keep `npm run connect:secure` running and refresh connector metadata in ChatGPT.
+- Supervised runtime is unavailable: run `npm run runtime:status` and follow [WINDOWS_RUNTIME.md](WINDOWS_RUNTIME.md#recovery).
 - Local MCP is unreachable: run `curl http://127.0.0.1:8787/health` while the local server is running.

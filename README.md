@@ -83,6 +83,8 @@ Use GPT Repo MCP. Which repositories can you access?
 
 Need help choosing **Server URL** vs **Tunnel ID**? See [ChatGPT connector setup](docs/CHATGPT_CONNECT.md#server-url-or-tunnel).
 
+On Windows, install the optional [supervised runtime](docs/WINDOWS_RUNTIME.md) after the connector works. It starts at sign-in, monitors MCP and ngrok independently, and lets an allowlisted ChatGPT workflow reload a newly built MCP process without an interactive terminal.
+
 ```text
 Clone -> Install -> Add repo -> Choose mode -> Connect ChatGPT -> Start working
 ```
@@ -234,6 +236,10 @@ Read the full model in [docs/SECURITY.md](docs/SECURITY.md).
 | `npm run connect` | Start the MCP server, reuse the stable user-local path value, and try to use or reuse an ngrok HTTPS tunnel. |
 | `npm run connect:secure` | Start the MCP server and OpenAI Secure MCP Tunnel. |
 | `npm run install:desktop-launcher` | Create a Windows desktop command file that starts `npm run connect` from this checkout. |
+| `npm run install:windows-runtime` | Build and install the supervised current-user Windows runtime. |
+| `npm run runtime:status` | Read the supervised runtime heartbeat and process state. |
+| `npm run runtime:restart` | Schedule a bounded MCP-only reload through the supervisor. |
+| `npm run uninstall:windows-runtime` | Remove the supervised Windows scheduled task. |
 | `npm run mcp` | Start only the local MCP server with `config.local.json`. |
 | `npm run tunnel` | Start only an ngrok tunnel to local port `8787`. |
 | `npm run list` | List approved repositories. |
@@ -260,6 +266,7 @@ New to ngrok? See [Install ngrok from zero](docs/SETUP.md#install-ngrok-from-zer
 - [Setup](docs/SETUP.md)
 - [ChatGPT connector steps](docs/CHATGPT_CONNECT.md)
 - [Connection options](docs/CONNECTION_OPTIONS.md)
+- [Supervised Windows runtime](docs/WINDOWS_RUNTIME.md)
 - [Tool surface](docs/TOOL_SURFACE.md)
 - [Write workflows](docs/WRITE_WORKFLOWS.md)
 - [Security model](docs/SECURITY.md)
@@ -271,6 +278,7 @@ New to ngrok? See [Install ngrok from zero](docs/SETUP.md#install-ngrok-from-zer
 - Connector URL changed: the path value is stable across restarts; update ChatGPT only if the public tunnel host changed or the local path file was removed.
 - Write blocked: ask ChatGPT to run `repo_policy_explain` for the repo id and path.
 - Schema mismatch: refresh ChatGPT Developer Mode and run `npm test -- tests/mcp-contract.test.ts tests/tool-contracts.test.ts`.
+- Supervised runtime is stale: run `npm run runtime:status`, inspect the scheduled task, then see [Supervised Windows runtime](docs/WINDOWS_RUNTIME.md#recovery).
 - Tunnel 502: confirm the local server is running, check `/health`, then restart ngrok or try a fresh tunnel.
 
 ## License

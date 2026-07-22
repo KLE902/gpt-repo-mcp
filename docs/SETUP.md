@@ -145,6 +145,24 @@ npm run install:desktop-launcher
 
 The installer creates `Start GPT Repo MCP.cmd` on the current user's Desktop and records the current repository path in that local launcher. Double-click it after Windows starts and keep the command window open while ChatGPT uses the connector. Use `npm run install:desktop-launcher -- -Force` to replace an existing launcher.
 
+## Supervised Windows runtime
+
+After the normal connector works, Windows users can replace the interactive launcher with a current-user supervised runtime:
+
+```powershell
+npm run install:windows-runtime
+```
+
+This builds the server, installs a scheduled task that starts at sign-in, monitors MCP and ngrok independently, and adds fixed local `mcp.runtime.status` and `mcp.runtime.restart` script ids to the `gpt-repo-mcp` policy. Close the old desktop-launcher window once after installation so only the supervisor owns port `8787`.
+
+Verify it with:
+
+```powershell
+npm run runtime:status
+```
+
+See [WINDOWS_RUNTIME.md](WINDOWS_RUNTIME.md) for the restart workflow, security boundary, task management, and recovery procedure.
+
 ## Manual Tunnel Setup
 
 Use `npm run mcp` when you want to run the local server yourself and expose port `8787` through your own HTTPS tunnel, reverse proxy, or network setup:
@@ -188,6 +206,10 @@ Use GPT Repo MCP. Which repositories can you access?
 | `npm run connect` | Start the server, stable local path value, and ngrok. |
 | `npm run connect:secure` | Start the server and OpenAI Secure MCP Tunnel. |
 | `npm run install:desktop-launcher` | Create the Windows desktop launcher for this checkout. |
+| `npm run install:windows-runtime` | Build and install the supervised current-user Windows runtime. |
+| `npm run runtime:status` | Inspect the supervisor heartbeat, MCP, and tunnel state. |
+| `npm run runtime:restart` | Schedule a bounded MCP-only reload. |
+| `npm run uninstall:windows-runtime` | Remove the supervised Windows scheduled task. |
 | `npm run mcp` | Start only the local MCP server. |
 | `npm run tunnel` | Start only the ngrok tunnel. |
 | `npm run list` | List approved repositories. |
@@ -249,5 +271,6 @@ PR creation, check inspection, and merge use runtime GitHub access. Startup firs
 - Connector URL changed: the local path value persists under the user profile; update or refresh the connector only when the public tunnel host changed or the local file was removed.
 - Port `8787` is busy: stop the process using it, then rerun `npm run connect`.
 - ngrok endpoint already online: `npm run connect` tries to reuse an existing HTTPS tunnel from the local ngrok API.
+- Supervised runtime heartbeat is stale: run `npm run runtime:status`, inspect the scheduled task, and follow [WINDOWS_RUNTIME.md](WINDOWS_RUNTIME.md#recovery).
 - Schema mismatch in ChatGPT: refresh connector metadata, then run `npm test -- tests/tool-contracts.test.ts tests/mcp-contract.test.ts`.
 - Write disabled: keep the default read-mostly setup, or explicitly enable `writes.enabled` for a trusted repo.
