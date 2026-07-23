@@ -1,7 +1,7 @@
 import { execFile, spawn } from "node:child_process";
 import { Buffer } from "node:buffer";
 import { existsSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, resolve, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const SHA_PATTERN = /^[a-f0-9]{40}$/i;
@@ -286,7 +286,7 @@ export async function resolveGlobalNpmClaudeEntry(
   if (platform !== "win32") return null;
   const npmCliCandidates = [
     String(env.npm_execpath ?? "").trim(),
-    join(dirname(nodeExecutable), "node_modules", "npm", "bin", "npm-cli.js")
+    win32.join(win32.dirname(nodeExecutable), "node_modules", "npm", "bin", "npm-cli.js")
   ].filter(Boolean);
   const npmCli = npmCliCandidates.find((value) => fileExists(value));
   if (!npmCli) return null;
@@ -306,20 +306,21 @@ export function claudeNpmEntryCandidates(root, architecture = globalThis.process
   const arch = architecture === "arm64" ? "arm64" : "x64";
   const nativePackage = `claude-code-win32-${arch}`;
   return [
-    join(root, "@anthropic-ai", nativePackage, "claude.exe"),
-    join(root, "@anthropic-ai", "claude-code", "node_modules", "@anthropic-ai", nativePackage, "claude.exe"),
-    join(root, "@anthropic-ai", "claude-code", "claude.exe"),
-    join(root, "@anthropic-ai", "claude-code", "cli.js")
+    win32.join(root, "@anthropic-ai", nativePackage, "claude.exe"),
+    win32.join(root, "@anthropic-ai", "claude-code", "node_modules", "@anthropic-ai", nativePackage, "claude.exe"),
+    win32.join(root, "@anthropic-ai", "claude-code", "claude.exe"),
+    win32.join(root, "@anthropic-ai", "claude-code", "cli.js")
   ];
 }
 
 export function selectCliCandidate(name, candidates) {
+  const normalized = (value) => String(value).replaceAll("\\", "/").toLowerCase();
   const nativePackageBinary = candidates.find((value) =>
-    value.toLowerCase().includes(`${join("@anthropic-ai", "claude-code-win32-").toLowerCase()}`) &&
-    value.toLowerCase().endsWith("claude.exe")
+    normalized(value).includes("/@anthropic-ai/claude-code-win32-") &&
+    normalized(value).endsWith("/claude.exe")
   );
   const packageEntry = candidates.find((value) =>
-    value.toLowerCase().endsWith(join("@anthropic-ai", "claude-code", "cli.js").toLowerCase())
+    normalized(value).endsWith("/@anthropic-ai/claude-code/cli.js")
   );
   const commandShim = candidates.find((value) => /\.(cmd|bat)$/i.test(value));
   const executable = candidates.find((value) => value.toLowerCase().endsWith(".exe"));
@@ -335,16 +336,16 @@ export function knownWindowsCliCandidates(name, platform = globalThis.process.pl
   const localAppData = String(env.LOCALAPPDATA ?? "").trim();
   const candidates = [];
   if (userProfile) {
-    candidates.push(join(userProfile, ".local", "bin", `${name}.exe`));
-    candidates.push(join(userProfile, ".claude", "local", `${name}.exe`));
+    candidates.push(win32.join(userProfile, ".local", "bin", `${name}.exe`));
+    candidates.push(win32.join(userProfile, ".claude", "local", `${name}.exe`));
   }
   if (appData) {
-    candidates.push(join(appData, "npm", `${name}.cmd`));
+    candidates.push(win32.join(appData, "npm", `${name}.cmd`));
     if (name === "claude") {
-      candidates.push(join(appData, "npm", "node_modules", "@anthropic-ai", "claude-code", "cli.js"));
+      candidates.push(win32.join(appData, "npm", "node_modules", "@anthropic-ai", "claude-code", "cli.js"));
     }
   }
-  if (localAppData) candidates.push(join(localAppData, "Programs", name, `${name}.exe`));
+  if (localAppData) candidates.push(win32.join(localAppData, "Programs", name, `${name}.exe`));
   return candidates;
 }
 
@@ -453,7 +454,8 @@ export function resolveExecutableInvocation(
   fileExists = existsSync,
   nodeExecutable = globalThis.process.execPath
 ) {
-  if (executable.toLowerCase().endsWith(join("@anthropic-ai", "claude-code", "cli.js").toLowerCase())) {
+  const normalizedExecutable = String(executable).replaceAll("\\", "/").toLowerCase();
+  if (normalizedExecutable.endsWith("/@anthropic-ai/claude-code/cli.js")) {
     return { command: nodeExecutable, args: [executable, ...args] };
   }
 
@@ -461,8 +463,8 @@ export function resolveExecutableInvocation(
     return { command: executable, args };
   }
 
-  if (basename(executable).toLowerCase() === "claude.cmd") {
-    const cliEntry = join(dirname(executable), "node_modules", "@anthropic-ai", "claude-code", "cli.js");
+  if (win32.basename(executable).toLowerCase() === "claude.cmd") {
+    const cliEntry = win32.join(win32.dirname(executable), "node_modules", "@anthropic-ai", "claude-code", "cli.js");
     if (fileExists(cliEntry)) {
       return { command: nodeExecutable, args: [cliEntry, ...args] };
     }
