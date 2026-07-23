@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  buildAgentEnvironment,
   buildClaudeEnvironment,
   buildProbeInvocation,
   claudeNpmEntryCandidates,
@@ -100,9 +101,9 @@ describe("agent-cli-probe", () => {
       (path) => path === "C:\\Program Files\\Git\\bin\\bash.exe"
     );
     expect(result).toMatchObject({
-      SAFE: "yes",
       CLAUDE_CODE_GIT_BASH_PATH: "C:\\Program Files\\Git\\bin\\bash.exe"
     });
+    expect(result).not.toHaveProperty("SAFE");
   });
 
   test("fails closed when native Windows Claude has no Git Bash", () => {
@@ -190,7 +191,7 @@ describe("agent-cli-probe", () => {
       commandResult("codex-cli 1.2.3\n"),
       commandResult(help),
       commandResult(help),
-      commandResult(`${JSON.stringify({ type: "item.completed", item: { text: "PKR_CODEX_PROBE_OK" } })}\n`),
+      commandResult(`${JSON.stringify({ type: "item.completed", item: { text: "MCP_AGENT_CLI_CODEX_PROBE_OK" } })}\n`),
       commandResult(`${HEAD}\n`),
       commandResult("")
     ]);
@@ -210,7 +211,7 @@ describe("agent-cli-probe", () => {
       git: { head_sha: HEAD, clean_before: true, clean_after: true },
       output: { complete: true, truncated: false, marker_verified: true }
     });
-    expect(runner.calls[5].input).toContain("PKR_CODEX_PROBE_OK");
+    expect(runner.calls[5].input).toContain("MCP_AGENT_CLI_CODEX_PROBE_OK");
   });
 
   test("fails closed before launching an agent when the worktree is dirty", async () => {
@@ -226,6 +227,29 @@ describe("agent-cli-probe", () => {
       resolveCli: async () => "/usr/bin/claude"
     })).rejects.toMatchObject({ code: "WORKTREE_NOT_CLEAN" });
     expect(runner.calls).toHaveLength(2);
+  });
+
+  test("checks repository state after a failed provider invocation", async () => {
+    const help = "-p --output-format --permission-mode --disallowedTools";
+    const runner = queuedRunner([
+      commandResult(`${HEAD}\n`),
+      commandResult(""),
+      commandResult("2.1.89\n"),
+      commandResult(help),
+      commandResult("provider failed", { exitCode: 1 }),
+      commandResult(`${HEAD}\n`),
+      commandResult("")
+    ]);
+
+    await expect(probeAgentCli({
+      provider: "claude",
+      cwd: "/repo",
+      platform: "linux",
+      sourceEnv: { PATH: "/bin", HOME: "/home/fixture" },
+      runCommand: runner.run,
+      resolveCli: async () => "/usr/bin/claude"
+    })).rejects.toMatchObject({ code: "CLI_PROBE_FAILED" });
+    expect(runner.calls).toHaveLength(7);
   });
 
   test("verifies hidden documented Claude flags through execution rather than help text", () => {
@@ -251,7 +275,9 @@ describe("agent-cli-probe", () => {
       commandResult(""),
       commandResult("2.1.89\n"),
       commandResult(help),
-      commandResult('{"type":"result","is_error":true,"result":"probe failed"}\n', { exitCode: 1 })
+      commandResult('{"type":"result","is_error":true,"result":"probe failed"}\n', { exitCode: 1 }),
+      commandResult(`${HEAD}\n`),
+      commandResult("")
     ]);
 
     await expect(probeAgentCli({
@@ -266,14 +292,48 @@ describe("agent-cli-probe", () => {
     });
   });
 
-  test("validates structured provider output and rejects missing markers", () => {
-    expect(() => validateProbeOutput("claude", JSON.stringify({ type: "result", is_error: false, result: "PKR_CLAUDE_PROBE_OK" })))
-      .not.toThrow();
-    expect(() => validateProbeOutput("codex", `${JSON.stringify({ type: "item.completed", text: "PKR_CODEX_PROBE_OK" })}\n`))
-      .not.toThrow();
-    expect(() => validateProbeOutput("claude", JSON.stringify({ type: "result", is_error: false, result: "wrong" })))
-      .toThrow(/marker/);
+  test("validates exact structured provider markers and rejects malformed output", () => {
+    expect(() => validateProbeOutput("claude", JSON.stringify({
+      type: "result",
+      is_error: false,
+      result: "MCP_AGENT_CLI_CLAUDE_PROBE_OK"
+    }))).not.toThrow();
+    expect(() => validateProbeOutput("codex", `${JSON.stringify({
+      type: "item.completed",
+      text: "MCP_AGENT_CLI_CODEX_PROBE_OK"
+    })}\n`)).not.toThrow();
+    expect(() => validateProbeOutput("claude", JSON.stringify({
+      type: "result",
+      is_error: false,
+      result: "prefix MCP_AGENT_CLI_CLAUDE_PROBE_OK suffix"
+    }))).toThrow(/exact required probe marker/);
     expect(() => validateProbeOutput("codex", "not-json\n"))
       .toThrow(/non-JSONL/);
+  });
+
+  test("inherits only an explicit provider environment allowlist", () => {
+    expect(buildAgentEnvironment("codex", {
+      PATH: "/bin",
+      HOME: "/home/fixture",
+      CODEX_HOME: "/home/fixture/.codex",
+      CLAUDE_CONFIG_DIR: "/home/fixture/.claude",
+      UNRELATED: "drop-me"
+    }, "linux")).toEqual({
+      PATH: "/bin",
+      HOME: "/home/fixture",
+      CODEX_HOME: "/home/fixture/.codex"
+    });
+
+    expect(buildAgentEnvironment("claude", {
+      PATH: "/bin",
+      HOME: "/home/fixture",
+      CLAUDE_CONFIG_DIR: "/home/fixture/.claude",
+      CODEX_HOME: "/home/fixture/.codex",
+      UNRELATED: "drop-me"
+    }, "linux")).toEqual({
+      PATH: "/bin",
+      HOME: "/home/fixture",
+      CLAUDE_CONFIG_DIR: "/home/fixture/.claude"
+    });
   });
 });

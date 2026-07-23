@@ -6,8 +6,8 @@ import { pathToFileURL } from "node:url";
 
 const SHA_PATTERN = /^[a-f0-9]{40}$/i;
 const MARKERS = {
-  codex: "PKR_CODEX_PROBE_OK",
-  claude: "PKR_CLAUDE_PROBE_OK"
+  codex: "MCP_AGENT_CLI_CODEX_PROBE_OK",
+  claude: "MCP_AGENT_CLI_CLAUDE_PROBE_OK"
 };
 const CLI_NAMES = {
   codex: "codex",
@@ -16,14 +16,12 @@ const CLI_NAMES = {
 
 export async function probeAgentCli(options = {}) {
   const provider = normalizeProvider(options.provider ?? globalThis.process.argv[2]);
+  const platform = options.platform ?? globalThis.process.platform;
   const cwd = resolve(options.cwd ?? globalThis.process.cwd());
   const runCommand = options.runCommand ?? executeCommand;
-  const resolveCli = options.resolveCli ?? ((name) => resolveCliCommand(name, runCommand, options.platform ?? globalThis.process.platform));
+  const resolveCli = options.resolveCli ?? ((name) => resolveCliCommand(name, runCommand, platform));
   const timeoutMs = options.timeoutMs ?? 180_000;
   const maxOutputBytes = options.maxOutputBytes ?? 1_048_576;
-  const commandEnv = provider === "claude"
-    ? buildClaudeEnvironment(globalThis.process.env, options.platform ?? globalThis.process.platform)
-    : globalThis.process.env;
 
   const before = await readGitState(cwd, runCommand);
   if (!before.clean) {
@@ -32,32 +30,60 @@ export async function probeAgentCli(options = {}) {
     });
   }
 
-  const cliPath = await resolveCli(CLI_NAMES[provider]);
-  const versionResult = await runCommand(cliPath, ["--version"], { cwd, env: commandEnv, timeoutMs: 30_000, maxOutputBytes: 65_536 });
-  assertCommandSucceeded(versionResult, "CLI_VERSION_FAILED", `${provider} --version failed.`);
+  let commandEnv;
+  let cliPath;
+  let versionResult;
+  let capabilities;
+  let invocation;
+  let probeResult;
+  let failure;
 
-  const globalHelp = await runCommand(cliPath, ["--help"], { cwd, env: commandEnv, timeoutMs: 30_000, maxOutputBytes: 262_144 });
-  assertCommandSucceeded(globalHelp, "CLI_HELP_FAILED", `${provider} --help failed.`);
+  try {
+    commandEnv = buildAgentEnvironment(provider, options.sourceEnv ?? globalThis.process.env, platform);
+    cliPath = await resolveCli(CLI_NAMES[provider]);
+    versionResult = await runCommand(cliPath, ["--version"], {
+      cwd,
+      env: commandEnv,
+      timeoutMs: 30_000,
+      maxOutputBytes: 65_536
+    });
+    assertCommandSucceeded(versionResult, "CLI_VERSION_FAILED", `${provider} --version failed.`);
 
-  const providerHelp = provider === "codex"
-    ? await runCommand(cliPath, ["exec", "--help"], { cwd, env: commandEnv, timeoutMs: 30_000, maxOutputBytes: 262_144 })
-    : globalHelp;
-  assertCommandSucceeded(providerHelp, "CLI_HELP_FAILED", `${provider} non-interactive help failed.`);
+    const globalHelp = await runCommand(cliPath, ["--help"], {
+      cwd,
+      env: commandEnv,
+      timeoutMs: 30_000,
+      maxOutputBytes: 262_144
+    });
+    assertCommandSucceeded(globalHelp, "CLI_HELP_FAILED", `${provider} --help failed.`);
 
-  const capabilities = detectCapabilities(provider, `${globalHelp.stdout}\n${providerHelp.stdout}`);
-  const invocation = buildProbeInvocation(provider, capabilities, cwd);
-  const marker = MARKERS[provider];
-  const prompt = `Do not modify files and do not run shell commands. Return the exact marker ${marker} and nothing else.`;
-  const probeResult = await runCommand(cliPath, invocation.args, {
-    cwd,
-    input: prompt,
-    env: commandEnv,
-    timeoutMs,
-    maxOutputBytes
-  });
-  assertCommandSucceeded(probeResult, "CLI_PROBE_FAILED", `${provider} non-interactive probe failed.`);
-  validateProbeOutput(provider, probeResult.stdout, marker);
-  if (provider === "claude") capabilities.max_turns = true;
+    const providerHelp = provider === "codex"
+      ? await runCommand(cliPath, ["exec", "--help"], {
+        cwd,
+        env: commandEnv,
+        timeoutMs: 30_000,
+        maxOutputBytes: 262_144
+      })
+      : globalHelp;
+    assertCommandSucceeded(providerHelp, "CLI_HELP_FAILED", `${provider} non-interactive help failed.`);
+
+    capabilities = detectCapabilities(provider, `${globalHelp.stdout}\n${providerHelp.stdout}`);
+    invocation = buildProbeInvocation(provider, capabilities, cwd);
+    const marker = MARKERS[provider];
+    const prompt = `Do not modify files and do not run shell commands. Return the exact marker ${marker} and nothing else.`;
+    probeResult = await runCommand(cliPath, invocation.args, {
+      cwd,
+      input: prompt,
+      env: commandEnv,
+      timeoutMs,
+      maxOutputBytes
+    });
+    assertCommandSucceeded(probeResult, "CLI_PROBE_FAILED", `${provider} non-interactive probe failed.`);
+    validateProbeOutput(provider, probeResult.stdout, marker);
+    if (provider === "claude") capabilities.max_turns = true;
+  } catch (error) {
+    failure = error;
+  }
 
   const after = await readGitState(cwd, runCommand);
   if (after.head !== before.head) {
@@ -71,6 +97,7 @@ export async function probeAgentCli(options = {}) {
       changed_paths: after.status.split(/\r?\n/).filter(Boolean).slice(0, 20)
     });
   }
+  if (failure) throw failure;
 
   return {
     ok: true,
@@ -174,8 +201,8 @@ export function validateProbeOutput(provider, stdout, marker = MARKERS[provider]
     if (parsed?.is_error === true || parsed?.subtype?.startsWith?.("error")) {
       throw operationError("PROBE_PROVIDER_ERROR", "Claude returned an error result.");
     }
-    if (!String(parsed?.result ?? "").includes(marker)) {
-      throw operationError("PROBE_MARKER_MISSING", "Claude output did not contain the required probe marker.");
+    if (String(parsed?.result ?? "").trim() !== marker) {
+      throw operationError("PROBE_MARKER_MISSING", "Claude output was not the exact required probe marker.");
     }
     return;
   }
@@ -194,8 +221,9 @@ export function validateProbeOutput(provider, stdout, marker = MARKERS[provider]
     if (parsedCount === 0) {
       throw operationError("PROBE_OUTPUT_MISSING", "Codex returned no JSONL events.");
     }
-    if (!output.includes(marker)) {
-      throw operationError("PROBE_MARKER_MISSING", "Codex output did not contain the required probe marker.");
+    const events = lines.map((line) => JSON.parse(line));
+    if (!events.some((event) => event?.type === "item.completed" && containsExactString(event, marker))) {
+      throw operationError("PROBE_MARKER_MISSING", "Codex output did not contain the exact required completed-item marker.");
     }
     return;
   }
@@ -254,13 +282,52 @@ export async function resolveCliCommand(name, runCommand, platform) {
   return candidate;
 }
 
-export function buildClaudeEnvironment(
+export function buildAgentEnvironment(
+  provider,
   source = globalThis.process.env,
   platform = globalThis.process.platform,
   fileExists = existsSync
 ) {
-  const result = { ...source };
-  if (platform !== "win32") return result;
+  const allowedNames = new Set([
+    "PATH",
+    "HOME",
+    "USERPROFILE",
+    "APPDATA",
+    "LOCALAPPDATA",
+    "TEMP",
+    "TMP",
+    "TMPDIR",
+    "SystemRoot",
+    "WINDIR",
+    "ComSpec",
+    "PATHEXT",
+    "LANG",
+    "LC_ALL",
+    "XDG_CONFIG_HOME",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY"
+  ]);
+  if (provider === "codex") {
+    allowedNames.add("OPENAI_API_KEY");
+    allowedNames.add("CODEX_HOME");
+  } else if (provider === "claude") {
+    allowedNames.add("ANTHROPIC_API_KEY");
+    allowedNames.add("CLAUDE_CODE_OAUTH_TOKEN");
+    allowedNames.add("CLAUDE_CONFIG_DIR");
+    allowedNames.add("CLAUDE_CODE_GIT_BASH_PATH");
+    allowedNames.add("npm_execpath");
+  } else {
+    throw operationError("PROVIDER_NOT_SUPPORTED", `Unsupported provider: ${provider}`);
+  }
+
+  const result = {};
+  for (const name of allowedNames) {
+    const value = source[name];
+    if (typeof value === "string" && value.length > 0) result[name] = value;
+  }
+
+  if (platform !== "win32" || provider !== "claude") return result;
   const current = String(result.CLAUDE_CODE_GIT_BASH_PATH ?? "").trim().replace(/^"|"$/g, "");
   const candidates = [
     current,
@@ -274,6 +341,14 @@ export function buildClaudeEnvironment(
   }
   result.CLAUDE_CODE_GIT_BASH_PATH = bashPath;
   return result;
+}
+
+export function buildClaudeEnvironment(
+  source = globalThis.process.env,
+  platform = globalThis.process.platform,
+  fileExists = existsSync
+) {
+  return buildAgentEnvironment("claude", source, platform, fileExists);
 }
 
 export async function resolveGlobalNpmClaudeEntry(
@@ -349,6 +424,21 @@ export function knownWindowsCliCandidates(name, platform = globalThis.process.pl
   return candidates;
 }
 
+function containsExactString(value, expected) {
+  if (typeof value === "string") return value.trim() === expected;
+  if (Array.isArray(value)) return value.some((item) => containsExactString(item, expected));
+  if (!value || typeof value !== "object") return false;
+  return Object.values(value).some((item) => containsExactString(item, expected));
+}
+
+export function sanitizeDiagnosticText(value) {
+  return String(value ?? "")
+    .replace(/\b(?:sk|ghp|github_pat|glpat|xox[baprs])-[-A-Za-z0-9_]{8,}\b/gi, "<redacted-token>")
+    .replace(/\b(Bearer|Basic)\s+[^\s]+/gi, "$1 <redacted>")
+    .replace(/\b(api[_-]?key|token|password|secret)\s*[:=]\s*[^\s,;]+/gi, "$1=<redacted>")
+    .slice(-2048);
+}
+
 function requireCapabilities(provider, capabilities, required) {
   const missing = required.filter((name) => capabilities[name] !== true);
   if (missing.length > 0) {
@@ -368,8 +458,8 @@ function assertCommandSucceeded(result, code, message) {
   if (result?.exitCode !== 0) {
     throw operationError(code, message, {
       exit_code: result?.exitCode ?? null,
-      stdout: String(result?.stdout ?? "").slice(-4096),
-      stderr: String(result?.stderr ?? "").slice(-4096)
+      stdout: sanitizeDiagnosticText(result?.stdout),
+      stderr: sanitizeDiagnosticText(result?.stderr)
     });
   }
 }
@@ -388,7 +478,7 @@ export function executeCommand(executable, args, options = {}) {
 
     const child = spawn(invocation.command, invocation.args, {
       cwd: options.cwd,
-      env: options.env ?? globalThis.process.env,
+      env: options.env ?? buildAgentEnvironment("codex", globalThis.process.env, platform),
       windowsHide: true,
       shell: false,
       stdio: ["pipe", "pipe", "pipe"]
