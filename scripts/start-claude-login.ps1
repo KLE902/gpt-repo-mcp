@@ -60,7 +60,10 @@ function Set-ClaudeWindowsShell {
 
 if ($InteractiveChild) {
     try {
-        $Claude = Resolve-ClaudeBinary
+        $Claude = [string]$env:GPT_REPO_CLAUDE_BINARY
+        if ([string]::IsNullOrWhiteSpace($Claude) -or -not (Test-Path -LiteralPath $Claude -PathType Leaf)) {
+            throw "The verified Claude Code binary was not supplied to the login window."
+        }
         Set-ClaudeWindowsShell
         Write-Host "Complete the Claude Code sign-in in this window and the browser it opens."
         Write-Host "No command or token needs to be copied back to ChatGPT."
@@ -81,6 +84,9 @@ if ($InteractiveChild) {
         exit 1
     }
 }
+
+$ResolvedClaude = Resolve-ClaudeBinary
+$env:GPT_REPO_CLAUDE_BINARY = $ResolvedClaude
 
 $ScriptPath = $MyInvocation.MyCommand.Path
 $ChildArguments = @(

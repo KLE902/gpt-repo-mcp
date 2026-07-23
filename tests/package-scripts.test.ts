@@ -106,6 +106,8 @@ describe("package startup scripts", () => {
     expect(launcher).toContain("auth login");
     expect(launcher).toContain("auth status --text");
     expect(launcher).toContain("CLAUDE_AUTH_LOGIN_STARTED");
+    expect(launcher).toContain("GPT_REPO_CLAUDE_BINARY");
+    expect(launcher).toContain("$ResolvedClaude = Resolve-ClaudeBinary");
     expect(launcher).not.toContain("CLAUDE_CODE_OAUTH_TOKEN");
     expect(launcher).not.toContain("ANTHROPIC_API_KEY");
     expect(launcher).not.toContain("-Wait");
