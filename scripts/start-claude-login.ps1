@@ -1,41 +1,11 @@
 [CmdletBinding()]
 param(
-    [switch] $InteractiveChild
+    [switch] $InteractiveChild,
+    [string] $ClaudePath
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
-
-function Resolve-ClaudeBinary {
-    $Node = (Get-Command node.exe -ErrorAction Stop).Source
-    $NpmCli = [string]$env:npm_execpath
-    if ([string]::IsNullOrWhiteSpace($NpmCli) -or -not (Test-Path -LiteralPath $NpmCli -PathType Leaf)) {
-        $NpmCli = Join-Path (Split-Path -Parent $Node) "node_modules\npm\bin\npm-cli.js"
-    }
-    if (-not (Test-Path -LiteralPath $NpmCli -PathType Leaf)) {
-        throw "The npm CLI could not be resolved for the Claude Code login launcher."
-    }
-
-    $GlobalRoot = (& $Node $NpmCli root -g | Select-Object -First 1)
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($GlobalRoot)) {
-        throw "The global npm package root could not be resolved."
-    }
-    $GlobalRoot = $GlobalRoot.Trim()
-    $Architecture = if ([string]$env:PROCESSOR_ARCHITECTURE -match "ARM64") { "arm64" } else { "x64" }
-    $NativePackage = "claude-code-win32-$Architecture"
-    $Candidates = @(
-        (Join-Path $GlobalRoot "@anthropic-ai\$NativePackage\claude.exe"),
-        (Join-Path $GlobalRoot "@anthropic-ai\claude-code\node_modules\@anthropic-ai\$NativePackage\claude.exe"),
-        (Join-Path $env:USERPROFILE ".local\bin\claude.exe")
-    )
-
-    foreach ($Candidate in $Candidates) {
-        if (Test-Path -LiteralPath $Candidate -PathType Leaf) {
-            return $Candidate
-        }
-    }
-    throw "No verified Claude Code native binary was found."
-}
 
 function Set-ClaudeWindowsShell {
     $Current = [string]$env:CLAUDE_CODE_GIT_BASH_PATH
@@ -60,9 +30,12 @@ function Set-ClaudeWindowsShell {
 
 if ($InteractiveChild) {
     try {
-        $Claude = [string]$env:GPT_REPO_CLAUDE_BINARY
-        if ([string]::IsNullOrWhiteSpace($Claude) -or -not (Test-Path -LiteralPath $Claude -PathType Leaf)) {
-            throw "The verified Claude Code binary was not supplied to the login window."
+        if ([string]::IsNullOrWhiteSpace($ClaudePath) -or -not (Test-Path -LiteralPath $ClaudePath -PathType Leaf)) {
+            throw "The verified Claude Code binary path was not supplied to the login window."
+        }
+        $Claude = (Resolve-Path -LiteralPath $ClaudePath).Path
+        if ([System.IO.Path]::GetFileName($Claude) -ne "claude.exe") {
+            throw "The supplied Claude Code binary is not the expected native executable."
         }
         Set-ClaudeWindowsShell
         Write-Host "Complete the Claude Code sign-in in this window and the browser it opens."
@@ -85,20 +58,10 @@ if ($InteractiveChild) {
     }
 }
 
-$ResolvedClaude = Resolve-ClaudeBinary
-$env:GPT_REPO_CLAUDE_BINARY = $ResolvedClaude
-
-$ScriptPath = $MyInvocation.MyCommand.Path
-$ChildArguments = @(
-    "-NoProfile",
-    "-ExecutionPolicy", "Bypass",
-    "-File", $ScriptPath,
-    "-InteractiveChild"
-)
-[void](Start-Process -FilePath "powershell.exe" `
-    -ArgumentList $ChildArguments `
-    -WorkingDirectory $env:USERPROFILE `
-    -WindowStyle Normal `
-    -PassThru)
-
-Write-Output "CLAUDE_AUTH_LOGIN_STARTED"
+$Node = (Get-Command node.exe -ErrorAction Stop).Source
+$Launcher = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "start-claude-login.mjs"
+if (-not (Test-Path -LiteralPath $Launcher -PathType Leaf)) {
+    throw "The Claude Code login launcher could not be resolved."
+}
+& $Node $Launcher
+exit $LASTEXITCODE

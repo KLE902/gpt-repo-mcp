@@ -99,21 +99,30 @@ describe("package startup scripts", () => {
   });
 
   test("includes a bounded visible Claude login launcher", async () => {
-    const launcherPath = join(process.cwd(), "scripts", "start-claude-login.ps1");
-    await expect(access(launcherPath)).resolves.toBeUndefined();
-    const launcher = await readFile(launcherPath, "utf8");
-    expect(launcher).toContain("Start-Process");
-    expect(launcher).toContain("auth login");
-    expect(launcher).toContain("auth status --text");
-    expect(launcher).toContain("CLAUDE_AUTH_LOGIN_STARTED");
-    expect(launcher).toContain("GPT_REPO_CLAUDE_BINARY");
-    expect(launcher).toContain("$ResolvedClaude = Resolve-ClaudeBinary");
-    expect(launcher).not.toContain("CLAUDE_CODE_OAUTH_TOKEN");
-    expect(launcher).not.toContain("ANTHROPIC_API_KEY");
-    expect(launcher).not.toContain("-Wait");
+    const powershellLauncherPath = join(process.cwd(), "scripts", "start-claude-login.ps1");
+    const nodeLauncherPath = join(process.cwd(), "scripts", "start-claude-login.mjs");
+    await expect(access(powershellLauncherPath)).resolves.toBeUndefined();
+    await expect(access(nodeLauncherPath)).resolves.toBeUndefined();
+
+    const powershellLauncher = await readFile(powershellLauncherPath, "utf8");
+    expect(powershellLauncher).toContain("ClaudePath");
+    expect(powershellLauncher).toContain("auth login");
+    expect(powershellLauncher).toContain("auth status --text");
+    expect(powershellLauncher).not.toContain("npm root");
+    expect(powershellLauncher).not.toContain("CLAUDE_CODE_OAUTH_TOKEN");
+    expect(powershellLauncher).not.toContain("ANTHROPIC_API_KEY");
+
+    const nodeLauncher = await readFile(nodeLauncherPath, "utf8");
+    expect(nodeLauncher).toContain("resolveGlobalNpmClaudeEntry");
+    expect(nodeLauncher).toContain("detached: true");
+    expect(nodeLauncher).toContain("windowsHide: false");
+    expect(nodeLauncher).toContain("CLAUDE_AUTH_LOGIN_STARTED");
+    expect(nodeLauncher).not.toContain("CLAUDE_CODE_OAUTH_TOKEN");
+    expect(nodeLauncher).not.toContain("ANTHROPIC_API_KEY");
+    await expect(run(process.execPath, ["--check", nodeLauncherPath], process.cwd())).resolves.toBeDefined();
 
     if (process.platform !== "win32") return;
-    const escapedPath = launcherPath.replaceAll("'", "''");
+    const escapedPath = powershellLauncherPath.replaceAll("'", "''");
     const command = [
       "$lexemes = $null",
       "$parseIssues = $null",
