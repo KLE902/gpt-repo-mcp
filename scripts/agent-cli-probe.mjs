@@ -203,7 +203,7 @@ export function validateProbeOutput(provider, stdout, marker = MARKERS[provider]
   throw operationError("PROVIDER_NOT_SUPPORTED", `Unsupported provider: ${provider}`);
 }
 
-async function readGitState(cwd, runCommand) {
+export async function readGitState(cwd, runCommand) {
   const headResult = await runCommand("git", ["rev-parse", "HEAD"], { cwd, timeoutMs: 10_000, maxOutputBytes: 65_536 });
   assertCommandSucceeded(headResult, "GIT_HEAD_FAILED", "Could not read repository HEAD.");
   const head = String(headResult.stdout ?? "").trim().toLowerCase();
@@ -221,7 +221,7 @@ async function readGitState(cwd, runCommand) {
   return { head, status, clean: status === "" };
 }
 
-async function resolveCliCommand(name, runCommand, platform) {
+export async function resolveCliCommand(name, runCommand, platform) {
   if (name === "claude") {
     const packageEntry = await resolveGlobalNpmClaudeEntry(runCommand, platform);
     if (packageEntry) return packageEntry;
@@ -373,7 +373,7 @@ function assertCommandSucceeded(result, code, message) {
   }
 }
 
-function executeCommand(executable, args, options = {}) {
+export function executeCommand(executable, args, options = {}) {
   return new Promise((resolveCommand) => {
     const platform = options.platform ?? globalThis.process.platform;
     const invocation = resolveExecutableInvocation(executable, args, platform);

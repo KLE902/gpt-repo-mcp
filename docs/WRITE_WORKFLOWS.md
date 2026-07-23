@@ -439,6 +439,8 @@ The generic file writers do not provide:
 
 - shell execution
 - arbitrary Git commands, reset, checkout, or force operations
-- direct Codex execution
+- caller-supplied or unrestricted Codex execution
 - arbitrary writes outside the configured write policy
 - writes to absolute paths, traversal paths, symlink escapes, secret candidates, denied globs, device files, sockets, named pipes, binary edit targets, or secret-looking resulting content
+
+A repository may opt in to a fixed, locally configured agent wrapper through `repo_run_allowed_script`. That narrow path does not change the generic writer contract: the caller supplies only an allowlisted `script_id` and exact HEAD guard, while provider, executable, arguments, prompt/result paths, Git checks, timeout, output cap, environment inheritance, and tool restrictions remain server-owned.
