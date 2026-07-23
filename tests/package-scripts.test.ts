@@ -116,9 +116,11 @@ describe("package startup scripts", () => {
 
     const nodeLauncher = await readFile(nodeLauncherPath, "utf8");
     expect(nodeLauncher).toContain("resolveGlobalNpmClaudeEntry");
+    expect(nodeLauncher).toContain("buildAgentEnvironment");
+    expect(nodeLauncher).toContain("executeCommand");
     expect(nodeLauncher).toContain("knownWindowsCliCandidates");
-    expect(nodeLauncher).not.toContain("detached: true");
-    expect(nodeLauncher).not.toContain("windowsHide: false");
+    expect(nodeLauncher).not.toContain("spawn(");
+    expect(nodeLauncher).not.toContain("process.env,");
     expect(nodeLauncher).not.toContain("CLAUDE_AUTH_LOGIN_STARTED");
     expect(nodeLauncher).not.toContain("CLAUDE_CODE_OAUTH_TOKEN");
     expect(nodeLauncher).not.toContain("ANTHROPIC_API_KEY");

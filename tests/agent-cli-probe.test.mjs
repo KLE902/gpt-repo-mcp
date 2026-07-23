@@ -45,8 +45,8 @@ describe("agent-cli-probe", () => {
   test("detects and builds the required Codex read-only invocation", () => {
     const capabilities = detectCapabilities("codex", "exec --json --sandbox -C, --cd --output-schema --output-last-message");
     expect(capabilities).toMatchObject({ exec: true, json: true, sandbox: true, cd: true, cd_flag: "--cd" });
-    expect(buildProbeInvocation("codex", capabilities, "C:\\Premium-Komga-Reader")).toEqual({
-      args: ["exec", "--json", "--sandbox", "read-only", "--cd", "C:\\Premium-Komga-Reader", "-"],
+    expect(buildProbeInvocation("codex", capabilities, "C:\\Repos\\Example")).toEqual({
+      args: ["exec", "--json", "--sandbox", "read-only", "--cd", "C:\\Repos\\Example", "-"],
       redactedArgs: ["exec", "--json", "--sandbox", "read-only", "--cd", "<repo-root>", "-"]
     });
 
@@ -198,7 +198,7 @@ describe("agent-cli-probe", () => {
 
     const result = await probeAgentCli({
       provider: "codex",
-      cwd: "C:\\Premium-Komga-Reader",
+      cwd: "C:\\Repos\\Example",
       runCommand: runner.run,
       resolveCli: async () => "C:\\Users\\fixture\\codex.exe"
     });
