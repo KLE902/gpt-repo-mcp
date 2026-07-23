@@ -36,6 +36,7 @@ import {
   writeStageCommitHandler,
   writeChangesHandler,
   writeCodexTaskHandler,
+  startCodexTaskHandler,
   writeFileHandler,
   writeHandoffHandler,
   policyExplainHandler,
@@ -441,6 +442,15 @@ export const toolCatalog: ToolDefinition[] = [
     outputSchema: toolContracts.repo_write_codex_task.output,
     annotations: writeAnnotations,
     handler: writeCodexTaskHandler
+  },
+  {
+    name: "repo_start_codex_task",
+    title: "Start verified Codex task",
+    description: descriptions.repo_start_codex_task,
+    inputSchema: toolContracts.repo_start_codex_task.input,
+    outputSchema: toolContracts.repo_start_codex_task.output,
+    annotations: writeAnnotations,
+    handler: startCodexTaskHandler
   },
   {
     name: "repo_codex_review",

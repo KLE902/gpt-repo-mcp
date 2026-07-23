@@ -48,6 +48,10 @@ export class PolicyExplainService {
       git_sync_enabled: operationsPolicy.config.git_sync_enabled,
       script_run_enabled: operationsPolicy.config.script_run_enabled,
       allowed_script_ids: Object.keys(operationsPolicy.config.allowed_scripts).sort(),
+      codex_task_run_enabled: operationsPolicy.config.codex_task_run_enabled,
+      codex_task_max_runtime_ms: operationsPolicy.config.codex_task_max_runtime_ms,
+      codex_task_max_output_bytes: operationsPolicy.config.codex_task_max_output_bytes,
+      codex_task_inherit_env: [...operationsPolicy.config.codex_task_inherit_env].sort(),
       cleanup_enabled: operationsPolicy.config.cleanup_enabled,
       max_paths_per_operation: operationsPolicy.config.max_paths_per_operation
     };

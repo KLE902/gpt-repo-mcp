@@ -37,6 +37,10 @@ export const PolicyExplainResultSchema = z.object({
     git_sync_enabled: z.boolean().describe("Whether guarded Git synchronization is enabled, including fast-forward base sync and conflict-preflighted feature-branch updates."),
     script_run_enabled: z.boolean().describe("Whether configured allowlisted scripts may run."),
     allowed_script_ids: z.array(z.string()).describe("Configured script ids available to the model; commands and arguments are not supplied by the model."),
+    codex_task_run_enabled: z.boolean().describe("Whether durable execution of existing verified Codex tasks is enabled."),
+    codex_task_max_runtime_ms: z.number().int().positive().describe("Server-owned maximum runtime for one Codex task."),
+    codex_task_max_output_bytes: z.number().int().positive().describe("Server-owned combined stdout and stderr byte limit for one Codex task."),
+    codex_task_inherit_env: z.array(z.string()).describe("Locally allowlisted environment variable names that may be inherited by the Codex runner."),
     cleanup_enabled: z.boolean().describe("Whether local cleanup operations are enabled."),
     max_paths_per_operation: z.number().int().positive().describe("Maximum explicit paths accepted by one local operation.")
   }).describe("Effective local and remote operation policy toggles for this repository."),

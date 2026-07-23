@@ -24,7 +24,7 @@ import {
   GitUnstageResultSchema
 } from "../src/contracts/git-operations.contract.js";
 import { CleanupPathsInputSchema, CleanupPathsResultSchema } from "../src/contracts/cleanup.contract.js";
-import { CodexReviewInputSchema, CodexReviewResultSchema, CodexTaskInputSchema, CodexTaskResultSchema, CodexTaskWriteInputSchema, CodexTaskWriteResultSchema } from "../src/contracts/codex-task.contract.js";
+import { CodexReviewInputSchema, CodexReviewResultSchema, CodexStartInputSchema, CodexStartResultSchema, CodexTaskInputSchema, CodexTaskResultSchema, CodexTaskWriteInputSchema, CodexTaskWriteResultSchema } from "../src/contracts/codex-task.contract.js";
 import { DecisionLogInputSchema, DecisionLogResultSchema } from "../src/contracts/decision.contract.js";
 import { GitReviewResultSchema } from "../src/contracts/git-review.contract.js";
 import { HandoffInputSchema, HandoffResultSchema } from "../src/contracts/handoff.contract.js";
@@ -90,6 +90,7 @@ describe("tool catalog contracts", () => {
       "repo_plan_review",
       "repo_prepare_codex_task",
       "repo_write_codex_task",
+      "repo_start_codex_task",
       "repo_codex_review",
       "repo_write_file",
       "repo_write_changes",
@@ -124,6 +125,7 @@ describe("tool catalog contracts", () => {
       "repo_write_changes",
       "repo_write_handoff",
       "repo_write_codex_task",
+      "repo_start_codex_task",
       "repo_git_stage",
       "repo_git_unstage",
       "repo_git_restore_paths",
@@ -145,6 +147,7 @@ describe("tool catalog contracts", () => {
     const policyExplain = toolCatalog.find((tool) => tool.name === "repo_policy_explain");
     const prepareCodexTask = toolCatalog.find((tool) => tool.name === "repo_prepare_codex_task");
     const writeCodexTask = toolCatalog.find((tool) => tool.name === "repo_write_codex_task");
+    const startCodexTask = toolCatalog.find((tool) => tool.name === "repo_start_codex_task");
     const codexReview = toolCatalog.find((tool) => tool.name === "repo_codex_review");
     const writeChanges = toolCatalog.find((tool) => tool.name === "repo_write_changes");
     const writeHandoff = toolCatalog.find((tool) => tool.name === "repo_write_handoff");
@@ -165,6 +168,10 @@ describe("tool catalog contracts", () => {
     expect(writeCodexTask?.inputSchema).toBe(CodexTaskWriteInputSchema);
     expect(writeCodexTask?.outputSchema).toBe(CodexTaskWriteResultSchema);
     expect(writeCodexTask?.annotations).toEqual(writeAnnotations);
+    expect(startCodexTask).toBeDefined();
+    expect(startCodexTask?.inputSchema).toBe(CodexStartInputSchema);
+    expect(startCodexTask?.outputSchema).toBe(CodexStartResultSchema);
+    expect(startCodexTask?.annotations).toEqual(writeAnnotations);
     expect(codexReview).toBeDefined();
     expect(codexReview?.inputSchema).toBe(CodexReviewInputSchema);
     expect(codexReview?.outputSchema).toBe(CodexReviewResultSchema);
@@ -1629,12 +1636,46 @@ describe("tool catalog contracts", () => {
         },
         {
           "annotations": {
+            "destructiveHint": true,
+            "idempotentHint": false,
+            "openWorldHint": false,
+            "readOnlyHint": false,
+          },
+          "description": "Use this when an existing repo_write_codex_task run should be started without manual prompt relay. Requires dedicated local opt-in, exact branch and HEAD, a clean non-base branch, verified manifest and prompt hash, a single-writer lock, fixed Codex invocation, and durable repo-local execution state. The caller cannot supply prompt text, command, arguments, model, sandbox, timeout, environment, working directory, or Git delivery instructions.",
+          "inputKeys": [
+            "dry_run",
+            "expected_branch",
+            "expected_head_sha",
+            "reason",
+            "repo_id",
+            "run_id",
+          ],
+          "name": "repo_start_codex_task",
+          "outputKeys": [
+            "dry_run",
+            "execution_path",
+            "execution_state",
+            "invocation",
+            "next_steps",
+            "ok",
+            "repo_id",
+            "run_id",
+            "started",
+            "stderr_path",
+            "stdout_path",
+            "validated",
+            "warnings",
+          ],
+          "title": "Start verified Codex task",
+        },
+        {
+          "annotations": {
             "destructiveHint": false,
             "idempotentHint": true,
             "openWorldHint": false,
             "readOnlyHint": true,
           },
-          "description": "Use this when Codex has finished or the user asks to review a repo-local Codex run. Reads .chatgpt/codex-runs/<run_id>/RESULT.md and git diff review state without mutating files or git.",
+          "description": "Use this when the user asks for Codex task status or review. Reads durable execution state when present; reports active, completed, blocked, failed, or timed-out runs together with RESULT.md and Git review as applicable. Legacy manual RESULT.md runs remain supported.",
           "inputKeys": [
             "max_files",
             "repo_id",
@@ -1643,6 +1684,8 @@ describe("tool catalog contracts", () => {
           "name": "repo_codex_review",
           "outputKeys": [
             "codex_result",
+            "execution_found",
+            "execution_state",
             "git_review",
             "next_steps",
             "next_tool_payloads",

@@ -4,7 +4,7 @@ import type { z } from "zod";
 import { AllowedScriptInputSchema, AllowedScriptResultSchema, BranchListInputSchema, BranchListResultSchema, FinalizePullRequestInputSchema, FinalizePullRequestResultSchema, SwitchBranchInputSchema, SwitchBranchResultSchema, WorkflowDispatchInputSchema, WorkflowDispatchResultSchema } from "../contracts/autonomous-operations.contract.js";
 import { ChangePlanInputSchema, ChangePlanResultSchema } from "../contracts/change-plan.contract.js";
 import { CleanupPathsInputSchema, CleanupPathsResultSchema } from "../contracts/cleanup.contract.js";
-import { CodexReviewInputSchema, CodexReviewResultSchema, CodexTaskInputSchema, CodexTaskResultSchema, CodexTaskWriteInputSchema, CodexTaskWriteResultSchema } from "../contracts/codex-task.contract.js";
+import { CodexReviewInputSchema, CodexReviewResultSchema, CodexStartInputSchema, CodexStartResultSchema, CodexTaskInputSchema, CodexTaskResultSchema, CodexTaskWriteInputSchema, CodexTaskWriteResultSchema } from "../contracts/codex-task.contract.js";
 import { DecisionLogInputSchema, DecisionLogResultSchema } from "../contracts/decision.contract.js";
 import { FetchFileInputSchema, FileContentSchema, ReadManyInputSchema, ReadManyResultSchema } from "../contracts/file.contract.js";
 import { GitCommitInputSchema, GitCommitResultSchema, GitRecoverInputSchema, GitRecoverResultSchema, GitRestorePathsInputSchema, GitRestorePathsResultSchema, GitStageCommitInputSchema, GitStageCommitResultSchema, GitStageInputSchema, GitStageResultSchema, GitUnstageInputSchema, GitUnstageResultSchema } from "../contracts/git-operations.contract.js";
@@ -69,6 +69,7 @@ export type ToolName =
   | "repo_plan_review"
   | "repo_prepare_codex_task"
   | "repo_write_codex_task"
+  | "repo_start_codex_task"
   | "repo_codex_review"
   | "repo_write_file"
   | "repo_write_changes"
@@ -255,6 +256,10 @@ export const toolContracts = {
   repo_write_codex_task: {
     input: CodexTaskWriteInputSchema,
     output: CodexTaskWriteResultSchema
+  },
+  repo_start_codex_task: {
+    input: CodexStartInputSchema,
+    output: CodexStartResultSchema
   },
   repo_codex_review: {
     input: CodexReviewInputSchema,

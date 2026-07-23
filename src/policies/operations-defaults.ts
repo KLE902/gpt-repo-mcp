@@ -12,6 +12,10 @@ export const DEFAULT_OPERATIONS_POLICY = {
   git_sync_enabled: false,
   script_run_enabled: false,
   allowed_scripts: {},
+  codex_task_run_enabled: false,
+  codex_task_max_runtime_ms: 1_800_000,
+  codex_task_max_output_bytes: 1_048_576,
+  codex_task_inherit_env: [],
   max_paths_per_operation: 50,
   cleanup_enabled: false,
   cleanup_allowed_globs: [

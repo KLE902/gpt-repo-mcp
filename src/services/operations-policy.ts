@@ -9,6 +9,12 @@ export type AllowedScriptConfig = {
   inherit_env: string[];
 };
 
+export type CodexTaskRunPolicy = {
+  timeout_ms: number;
+  max_output_bytes: number;
+  inherit_env: string[];
+};
+
 export type OperationsPolicyConfig = {
   enabled?: boolean;
   git_stage_enabled?: boolean;
@@ -23,6 +29,10 @@ export type OperationsPolicyConfig = {
   git_sync_enabled?: boolean;
   script_run_enabled?: boolean;
   allowed_scripts?: Record<string, Partial<AllowedScriptConfig> & Pick<AllowedScriptConfig, "command">>;
+  codex_task_run_enabled?: boolean;
+  codex_task_max_runtime_ms?: number;
+  codex_task_max_output_bytes?: number;
+  codex_task_inherit_env?: string[];
   max_paths_per_operation?: number;
   cleanup_enabled?: boolean;
   cleanup_allowed_globs?: string[];
@@ -42,6 +52,10 @@ export type EffectiveOperationsPolicy = {
   git_sync_enabled: boolean;
   script_run_enabled: boolean;
   allowed_scripts: Record<string, AllowedScriptConfig>;
+  codex_task_run_enabled: boolean;
+  codex_task_max_runtime_ms: number;
+  codex_task_max_output_bytes: number;
+  codex_task_inherit_env: string[];
   max_paths_per_operation: number;
   cleanup_enabled: boolean;
   cleanup_allowed_globs: string[];
@@ -65,6 +79,10 @@ export class OperationsPolicy {
       git_sync_enabled: config.git_sync_enabled ?? DEFAULT_OPERATIONS_POLICY.git_sync_enabled,
       script_run_enabled: config.script_run_enabled ?? DEFAULT_OPERATIONS_POLICY.script_run_enabled,
       allowed_scripts: normalizeScripts(config.allowed_scripts ?? DEFAULT_OPERATIONS_POLICY.allowed_scripts),
+      codex_task_run_enabled: config.codex_task_run_enabled ?? DEFAULT_OPERATIONS_POLICY.codex_task_run_enabled,
+      codex_task_max_runtime_ms: config.codex_task_max_runtime_ms ?? DEFAULT_OPERATIONS_POLICY.codex_task_max_runtime_ms,
+      codex_task_max_output_bytes: config.codex_task_max_output_bytes ?? DEFAULT_OPERATIONS_POLICY.codex_task_max_output_bytes,
+      codex_task_inherit_env: [...(config.codex_task_inherit_env ?? DEFAULT_OPERATIONS_POLICY.codex_task_inherit_env)],
       max_paths_per_operation: config.max_paths_per_operation ?? DEFAULT_OPERATIONS_POLICY.max_paths_per_operation,
       cleanup_enabled: config.cleanup_enabled ?? DEFAULT_OPERATIONS_POLICY.cleanup_enabled,
       cleanup_allowed_globs: config.cleanup_allowed_globs ?? [...DEFAULT_OPERATIONS_POLICY.cleanup_allowed_globs]
@@ -106,9 +124,7 @@ export class OperationsPolicy {
   assertWorkflowAllowed(workflowId: string): void {
     this.assertEnabled();
     if (!this.config.github_workflow_dispatch_enabled) throw new RepoReaderError("GITHUB_WORKFLOW_DISPATCH_DISABLED", "GitHub Actions workflow dispatch is disabled for this repository.");
-    if (!this.config.allowed_workflows.includes(workflowId)) {
-      throw new RepoReaderError("GITHUB_WORKFLOW_NOT_ALLOWED", `Workflow ${workflowId} is not allowlisted for this repository.`);
-    }
+    if (!this.config.allowed_workflows.includes(workflowId)) throw new RepoReaderError("GITHUB_WORKFLOW_NOT_ALLOWED", `Workflow ${workflowId} is not allowlisted for this repository.`);
   }
 
   assertMergeAllowed(): void {
@@ -129,6 +145,16 @@ export class OperationsPolicy {
     return script;
   }
 
+  getCodexTaskRunPolicy(): CodexTaskRunPolicy {
+    this.assertEnabled();
+    if (!this.config.codex_task_run_enabled) throw new RepoReaderError("CODEX_TASK_RUN_DISABLED", "Durable Codex task execution is disabled for this repository.");
+    return {
+      timeout_ms: this.config.codex_task_max_runtime_ms,
+      max_output_bytes: this.config.codex_task_max_output_bytes,
+      inherit_env: [...this.config.codex_task_inherit_env]
+    };
+  }
+
   assertRestoreAllowed(paths: string[]): void {
     this.assertEnabled();
     this.assertPathCount(paths);
@@ -147,9 +173,7 @@ export class OperationsPolicy {
 
   private assertPathCount(paths: string[]): void {
     if (paths.length === 0) throw new RepoReaderError("GIT_OPERATION_PATHS_REQUIRED", "At least one explicit path is required.");
-    if (paths.length > this.config.max_paths_per_operation) {
-      throw new RepoReaderError("GIT_OPERATION_TOO_MANY_PATHS", `Too many paths for one operation: ${paths.length}`);
-    }
+    if (paths.length > this.config.max_paths_per_operation) throw new RepoReaderError("GIT_OPERATION_TOO_MANY_PATHS", `Too many paths for one operation: ${paths.length}`);
   }
 }
 

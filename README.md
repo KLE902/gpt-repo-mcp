@@ -27,9 +27,9 @@ This project is not affiliated with OpenAI, ChatGPT, Anthropic, or the Model Con
 
 1. ChatGPT reads the repo and plans the change.
 2. ChatGPT can implement directly with single-file or multi-file writes.
-3. Or ChatGPT can prepare a focused Codex/Claude task for another agent to run.
-4. ChatGPT reviews the actual git diff and any Codex/Claude result written back into the repo.
-5. ChatGPT recommends the next step: revise, recover, stage, or create a local commit.
+3. Or ChatGPT can create a focused repo-local Codex task and, with separate local opt-in, start that exact verified task without manual prompt relay.
+4. ChatGPT reads durable execution status, the result, and the actual Git diff; long runs can be reread in a later turn.
+5. ChatGPT recommends the next step: revise, recover, verify, stage, commit, or continue the guarded delivery flow.
 
 ## Quickstart
 
@@ -166,7 +166,7 @@ Codex is done. Review the Codex result and the git diff for <repo_id>.
 | Local ship flow | `repo_write_create_branch`, `repo_git_branches`, `repo_write_switch_branch`, `repo_write_stage`, `repo_write_unstage`, `repo_write_commit`, `repo_write_stage_commit`, `repo_write_recover`, `repo_cleanup_paths`, `repo_run_allowed_script` |
 | GitHub remote flow | `repo_remote_status`, `repo_remote_pull_requests`, `repo_branch_audit`, `repo_write_push`, `repo_write_pull_request`, `repo_write_retire_pull_request`, `repo_write_retire_branch`, `repo_write_merge_pull_request`, `repo_write_finalize_pull_request`, `repo_write_sync_base`, `repo_write_update_branch_from_base`, `repo_write_dispatch_workflow` |
 | Compatibility aliases | `repo_git_stage`, `repo_git_unstage`, `repo_git_commit` |
-| Codex/Claude coordination | `repo_prepare_codex_task`, `repo_write_codex_task`, `repo_codex_review` |
+| Codex/Claude coordination | `repo_prepare_codex_task`, `repo_write_codex_task`, `repo_start_codex_task`, `repo_codex_review` |
 
 See [docs/TOOL_SURFACE.md](docs/TOOL_SURFACE.md) for full schemas, examples, output shapes, and recommended workflows.
 
@@ -197,17 +197,19 @@ The MCP writes:
 - `.chatgpt/codex-runs/<run_id>/PROMPT.md`
 - `.chatgpt/codex-runs/<run_id>/run.json`
 
-Give Codex or Claude the returned prompt path. The generated task asks the agent to write:
+For manual compatibility, give Codex the returned prompt path. When dedicated local Codex execution is enabled, ChatGPT can instead call `repo_start_codex_task` with the exact run id, feature branch, and HEAD. The start tool owns a fixed non-interactive invocation, bounded runtime/output, single-writer protection, and durable local state; callers cannot choose command, arguments, model, sandbox, timeout, environment, or working directory.
+
+The generated task asks Codex to write:
 
 - `.chatgpt/codex-runs/<run_id>/RESULT.md`
 
 Then ask ChatGPT:
 
 ```text
-Review the Codex result and the git diff for <run_id>.
+Review the Codex status, result, and git diff for <run_id>.
 ```
 
-ChatGPT can read the result, inspect the diff, and recommend the next step.
+ChatGPT can report `starting`, `running`, `completed`, `blocked`, `failed`, or `timed_out`. A long run can be reread later without copying the prompt or relaying terminal output. ChatGPT then reviews the actual diff and recommends verification, recovery, commit, or delivery.
 
 ## ChatGPT Session Handoffs
 
@@ -223,7 +225,7 @@ GPT Repo MCP is intentionally not a shell runner.
 - Mutating tools are disabled until a repo opts in.
 - File writes are checked against allow/deny policy, path sandboxing, size limits, and secret scanning.
 - Local Git tools operate only on explicit paths and local commits; remote tools use fixed Git arguments and GitHub REST endpoints.
-- There are no generic push/pull/merge, reset, checkout, rebase, stash, force, shell, or arbitrary-command tools. Existing-branch switch and post-merge deletion are fixed-purpose, clean-worktree operations with exact branch/HEAD/PR guards. Allowlisted scripts use server-owned commands and arguments; the optional `github.pr-ready` wrapper delegates one exact, verified draft-ready transition to the authenticated GitHub CLI. Remote delivery remains limited to `origin`, exact PR operations, owner-approved merge, verified cleanup, and locally allowlisted workflow dispatch with exact remote ref-SHA guards.
+- There are no generic push/pull/merge, reset, checkout, rebase, stash, force, shell, or arbitrary-command tools. `repo_start_codex_task` can only start an existing verified task through a fixed disabled-by-default local policy; it is not a general agent or command runner. Existing-branch switch and post-merge deletion are fixed-purpose, clean-worktree operations with exact branch/HEAD/PR guards. Allowlisted scripts use server-owned commands and arguments; the optional `github.pr-ready` wrapper delegates one exact, verified draft-ready transition to the authenticated GitHub CLI. Remote delivery remains limited to `origin`, exact PR operations, owner-approved merge, verified cleanup, and locally allowlisted workflow dispatch with exact remote ref-SHA guards.
 
 Read the full model in [docs/SECURITY.md](docs/SECURITY.md).
 

@@ -87,8 +87,10 @@ export const descriptions = {
     "Use this when the user explicitly wants chat-copy mode: a Codex prompt returned in chat for review/copying. Does not write files or implement the change. Do not use when Codex will be told to implement .chatgpt/codex-runs/<run_id>/PROMPT.md; use repo_write_codex_task instead.",
   repo_write_codex_task:
     "Use this when the user explicitly asks to create, write, start, resume, or hand off a repo-local Codex prompt/task/run that Codex will execute from the repo. Prefer this by default for repo-local Codex delegation. Writes only .chatgpt/codex-runs/<run_id>/PROMPT.md and run.json through repo write policy; does not implement, stage, commit, push, or run Codex.",
+  repo_start_codex_task:
+    "Use this when an existing repo_write_codex_task run should be started without manual prompt relay. Requires dedicated local opt-in, exact branch and HEAD, a clean non-base branch, verified manifest and prompt hash, a single-writer lock, fixed Codex invocation, and durable repo-local execution state. The caller cannot supply prompt text, command, arguments, model, sandbox, timeout, environment, working directory, or Git delivery instructions.",
   repo_codex_review:
-    "Use this when Codex has finished or the user asks to review a repo-local Codex run. Reads .chatgpt/codex-runs/<run_id>/RESULT.md and git diff review state without mutating files or git.",
+    "Use this when the user asks for Codex task status or review. Reads durable execution state when present; reports active, completed, blocked, failed, or timed-out runs together with RESULT.md and Git review as applicable. Legacy manual RESULT.md runs remain supported.",
   repo_write_file:
     "Use this when the user explicitly asks to write or precisely edit one allowed repository file. Primary low-friction single-file writer/editor for docs, notes, prompts, and focused code edits; requires user approval, repo opt-in, and never runs shell, git, or Codex.",
   repo_write_changes:

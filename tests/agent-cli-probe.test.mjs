@@ -324,6 +324,15 @@ describe("agent-cli-probe", () => {
       CODEX_HOME: "/home/fixture/.codex"
     });
 
+    expect(buildAgentEnvironment("codex", {
+      PATH: "/bin",
+      CUSTOM_HOME: "/custom/home",
+      UNRELATED: "drop-me"
+    }, "linux", undefined, ["CUSTOM_HOME"])).toEqual({
+      PATH: "/bin",
+      CUSTOM_HOME: "/custom/home"
+    });
+
     expect(buildAgentEnvironment("claude", {
       PATH: "/bin",
       HOME: "/home/fixture",
