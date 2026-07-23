@@ -609,15 +609,17 @@ Example:
 
 ### `repo_start_codex_task`
 
-Starts only an existing verified `repo_write_codex_task` run. It requires the dedicated disabled-by-default local execution opt-in, exact branch and HEAD guards, a clean non-base branch, matching manifest identity and prompt SHA-256, a non-empty allowed-path scope, absent prior result/execution/output artifacts, gitignored execution paths, no active repository Codex writer, and verified Codex CLI capabilities.
+Starts only an existing verified `repo_write_codex_task` run. It requires the dedicated disabled-by-default local execution opt-in, exact branch and HEAD guards, a clean non-base branch, matching manifest identity and prompt SHA-256, a non-empty allowed-path scope, absent prior result/execution/output artifacts, gitignored execution paths, and no active repository Codex writer.
+
+Before execution state is created, the tool verifies CLI capability and read-only authentication, then performs one real isolated `workspace-write` operation. The expected probe file must be created through a recognized built-in Codex operation, verified exactly, removed, and followed by an unchanged branch, HEAD, index, and worktree check. CLI help containing `--sandbox` or a successful authentication marker alone is not sufficient.
 
 Input: `repo_id`, `run_id`, `expected_branch`, `expected_head_sha`, optional `dry_run`, and optional `reason`.
 
 The input contract deliberately excludes prompt text, command, argument list, model, reasoning level, sandbox, timeout, environment, provider, working directory, verification commands, and Git delivery instructions. The implementation and local policy own those values.
 
-A real start creates `execution.json`, starts a separate bounded runner, and returns after the runner confirms `running` or reaches a terminal state. The runner invokes fixed Codex non-interactive JSONL execution with `workspace-write`, the exact repository root, prompt input through stdin, `shell: false`, `windowsHide`, a restricted environment, bounded redacted stdout/stderr, and process-tree termination at timeout.
+A real start creates `execution.json`, starts a separate bounded runner, and returns after the runner confirms `running` or reaches a terminal state. The runner invokes fixed Codex non-interactive JSONL execution with `workspace-write`, the exact repository root, prompt input through stdin, `shell: false`, `windowsHide`, a restricted environment, bounded redacted stdout/stderr, and process-tree termination at timeout. It classifies structured sandbox failures and known bounded diagnostics, rejects Node/JavaScript REPL filesystem or Git fallback, and fails closed when a material change lacks positive built-in operation provenance.
 
-Output: validation/start flags, exact execution/stdout/stderr paths, fixed invocation metadata, optional current execution state, next steps, and warnings. A long-running task is reread through `repo_codex_review`; the start call is not kept open for the complete Codex execution and no automatic retry occurs.
+Output: validation/start flags, exact execution/stdout/stderr paths, fixed invocation metadata including sandbox bootstrap and sandboxed-operation verification, optional current execution state, next steps, and warnings. A long-running task is reread through `repo_codex_review`; the start call is not kept open for the complete Codex execution and no automatic retry occurs.
 
 Example dry run:
 
@@ -637,13 +639,13 @@ Reads durable execution state when present and preserves legacy manual `RESULT.m
 
 Input: `repo_id`, `run_id`, optional `max_files`.
 
-For `starting` or `running`, output includes execution identity, branch/SHA provenance, runner/process identity, current process activity, bounded state, and a later-reread instruction. It does not ask for manual prompt or result relay.
+For `starting` or `running`, output includes execution identity, branch/SHA provenance, runner/process identity, current process activity, requested sandbox, bootstrap status, pending execution-boundary state, and a later-reread instruction. It does not ask for manual prompt or result relay.
 
-For `completed` or `blocked`, output includes execution state, parsed `RESULT.md`, Git review, changed paths, scope/forbidden-path findings, and the normal review-provided commit or recovery payloads.
+For verified `completed` or `blocked`, output includes execution state, explicit execution-boundary evidence, parsed `RESULT.md`, Git review, changed paths, scope/forbidden-path findings, and the normal review-provided commit or recovery payloads. A durable state that claims success without positive boundary evidence is reported as unverified and its result is not trusted.
 
-For `failed` or `timed_out`, output includes terminal state, safe diagnostics, branch/HEAD/worktree assessment, Git review when changes exist, and guarded recovery payloads. Evidence is preserved; review does not restore files automatically.
+For `failed` or `timed_out`, output includes terminal state, requested sandbox, bootstrap result, sandbox failure and code, fallback-tool violations, execution-boundary classification reason, safe diagnostics, branch/HEAD/worktree assessment, Git review when changes exist, and guarded recovery payloads. Evidence is preserved; review does not restore files automatically. A correct diff or zero exit code does not hide the boundary failure.
 
-When no `execution.json` exists, the previous manual behavior remains: the tool reads `RESULT.md` and Git review, or reports `CODEX_RESULT_MISSING` for an unfinished legacy run.
+When no `execution.json` exists, the previous manual behavior remains: the tool reads `RESULT.md` and Git review, or reports `CODEX_RESULT_MISSING` for an unfinished legacy run. Older durable state with an `execution.json` but no boundary evidence is explicitly unverified rather than treated as manual success.
 Example:
 
 ```json

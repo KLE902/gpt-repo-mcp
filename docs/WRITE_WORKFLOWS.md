@@ -228,15 +228,15 @@ The manifest includes repository/run identity, exact prompt/result paths, prompt
 
 `repo_start_codex_task` accepts only `repo_id`, `run_id`, `expected_branch`, `expected_head_sha`, optional `dry_run`, and optional `reason`. It does not accept prompt text, command, arguments, model, reasoning level, sandbox, timeout, environment, working directory, verification commands, provider, or Git delivery instructions. Those values are fixed by implementation and local policy.
 
-Before start, the tool requires a clean non-base branch, exact HEAD, a valid executable task manifest, a matching prompt hash, non-empty allowed paths, absent prior result/execution/output artifacts, gitignored execution files, no active repository Codex writer, and verified Codex CLI capabilities. The runner uses fixed non-interactive JSONL output, `workspace-write`, the exact repository root, and prompt input through stdin.
+Before start, the tool requires a clean non-base branch, exact HEAD, a valid executable task manifest, a matching prompt hash, non-empty allowed paths, absent prior result/execution/output artifacts, gitignored execution files, and no active repository Codex writer. It first verifies CLI capability and read-only authentication, then performs one real isolated `workspace-write` operation. The expected probe file must be created through a recognized built-in Codex operation, verified byte-for-byte, removed, and followed by an unchanged branch, HEAD, index, and worktree check. A visible `--sandbox` help flag or authentication marker alone is not sufficient. The runner then uses fixed non-interactive JSONL output, `workspace-write`, the exact repository root, and prompt input through stdin.
 
 The short MCP start call launches a separate bounded runner and returns once the runner confirms `running` or reaches a terminal state. It does not keep the connector request open for the complete Codex run. A connector or client timeout after the runner has started does not remove local execution state or trigger an automatic retry. Call `repo_codex_review` again with the same `run_id` to recover durable truth.
 
-The exact run directory may contain `execution.json`, `stdout.jsonl`, `stderr.log`, and `RESULT.md`. Execution states are `starting`, `running`, `completed`, `blocked`, `failed`, and `timed_out`. `blocked` is a valid terminal result when no execution contract was violated. Timeout kills the complete Codex process tree, preserves bounded redacted output, records the terminal state, and never restarts automatically.
+The exact run directory may contain `execution.json`, `stdout.jsonl`, `stderr.log`, and `RESULT.md`. Execution states are `starting`, `running`, `completed`, `blocked`, `failed`, and `timed_out`. Execution state also records the requested sandbox, bootstrap verification, detected sandbox failure and code, execution-boundary result, fallback-tool violations, and safe warnings. `completed` or `blocked` is valid only when the execution boundary is positively verified. Timeout kills the complete Codex process tree, preserves bounded redacted output, records the terminal state, and never restarts automatically.
 
-Postflight verifies branch, HEAD, changed paths, forbidden paths, other run directories, result UTF-8/status, and output completeness. A violation is reported as `failed`; evidence is preserved and no automatic restore occurs. Use the returned Git review and normal guarded recovery tools to decide what to retain.
+The runner evaluates timeout, truncation or malformed output, process/sandbox bootstrap failure, unsandboxed fallback or unknown write provenance, nonzero exit, invalid result, and Git/path contract violations before normal success. Known helper failures such as `orchestrator_helper_launch_failed`, a missing or unspawnable `codex-windows-sandbox-setup.exe`, `windows sandbox failed`, and `setup refresh failed` are terminal. Node/JavaScript REPL filesystem or Git use is a control-boundary violation. A material change without positive built-in operation provenance also fails closed. Exit code zero, `RESULT.md completed`, and an in-scope diff do not override any earlier control-boundary failure.
 
-Legacy manually run Codex tasks remain compatible. When `execution.json` is absent, `repo_codex_review` continues to read `RESULT.md` and the Git review as before.
+`repo_codex_review` reports the requested sandbox, bootstrap result, sandbox failure and code, fallback-tool violations, execution-boundary result, and a safe classification reason with the existing Git review and recovery payloads. Evidence is preserved and no automatic restore occurs. Older durable state without the boundary fields is explicitly unverified. Legacy manually run Codex tasks remain compatible only through the separate path where `execution.json` is absent; in that case `repo_codex_review` continues to read `RESULT.md` and the Git review as before.
 
 ### Local execution policy
 
@@ -255,6 +255,8 @@ Durable Codex execution is a separate opt-in and remains disabled by default. Co
 ```
 
 The maximum runtime, output limit, and environment names are server-owned. Do not commit local activation or real credentials. Codex task and execution artifacts are local working state under `.chatgpt/` and normally should not be committed.
+
+After a sandbox-related failed smoke, leave `codex_task_run_enabled` set to `false`. Merge and restart the corrected MCP first, repair the local official Codex Windows sandbox installation as a separate host operation, and require a new run id and successful smoke before enabling durable Codex for real repository work.
 
 ## ChatGPT Handoff Workflow
 

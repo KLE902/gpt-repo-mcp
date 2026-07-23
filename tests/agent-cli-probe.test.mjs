@@ -1,3 +1,6 @@
+import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import {
   buildAgentEnvironment,
@@ -7,6 +10,7 @@ import {
   detectCapabilities,
   knownWindowsCliCandidates,
   probeAgentCli,
+  runCodexSandboxVerification,
   resolveExecutableInvocation,
   resolveGlobalNpmClaudeEntry,
   selectCliCandidate,
@@ -192,6 +196,10 @@ describe("agent-cli-probe", () => {
       commandResult(help),
       commandResult(help),
       commandResult(`${JSON.stringify({ type: "item.completed", item: { text: "MCP_AGENT_CLI_CODEX_PROBE_OK" } })}\n`),
+      commandResult([
+        JSON.stringify({ type: "item.completed", item: { type: "command_execution", command: "write sandbox probe", status: "completed", exit_code: 0 } }),
+        JSON.stringify({ type: "item.completed", item: { text: "MCP_AGENT_CLI_CODEX_SANDBOX_OK" } })
+      ].join("\n") + "\n"),
       commandResult(`${HEAD}\n`),
       commandResult("")
     ]);
@@ -200,7 +208,10 @@ describe("agent-cli-probe", () => {
       provider: "codex",
       cwd: "C:\\Repos\\Example",
       runCommand: runner.run,
-      resolveCli: async () => "C:\\Users\\fixture\\codex.exe"
+      resolveCli: async () => "C:\\Users\\fixture\\codex.exe",
+      probeId: "fixture-probe",
+      readProbeFile: async () => "MCP_AGENT_CLI_CODEX_SANDBOX_FILE_OK\n",
+      cleanupProbe: async () => {}
     });
 
     expect(result).toMatchObject({
@@ -208,10 +219,141 @@ describe("agent-cli-probe", () => {
       provider: "codex",
       version: "codex-cli 1.2.3",
       authentication: "verified_by_non_interactive_probe",
+      verification: {
+        cli_capability: true,
+        authentication: true,
+        sandbox_bootstrap: true,
+        sandboxed_operation_verified: true
+      },
       git: { head_sha: HEAD, clean_before: true, clean_after: true },
       output: { complete: true, truncated: false, marker_verified: true }
     });
     expect(runner.calls[5].input).toContain("MCP_AGENT_CLI_CODEX_PROBE_OK");
+    expect(runner.calls[6].args).toContain("workspace-write");
+    expect(runner.calls[6].input).toContain(".chatgpt/sandbox-probes/fixture-probe/sandbox-write.txt");
+  });
+
+  test("the real workspace-write probe cleanup removes its exact artifact and empty probe root", async () => {
+    const root = await mkdtemp(join(tmpdir(), "codex-sandbox-probe-"));
+    const probeFile = join(root, ".chatgpt", "sandbox-probes", "clean-probe", "sandbox-write.txt");
+    const probeRoot = join(root, ".chatgpt", "sandbox-probes");
+    try {
+      const result = await runCodexSandboxVerification({
+        cliPath: "codex.exe",
+        cwd: root,
+        capabilities: { cd_flag: "--cd" },
+        env: {},
+        timeoutMs: 30_000,
+        maxOutputBytes: 65_536,
+        probeId: "clean-probe",
+        runCommand: async () => {
+          await mkdir(join(root, ".chatgpt", "sandbox-probes", "clean-probe"), { recursive: true });
+          await writeFile(probeFile, "MCP_AGENT_CLI_CODEX_SANDBOX_FILE_OK\n", "utf8");
+          return commandResult([
+            JSON.stringify({ type: "item.completed", item: { type: "file_change", status: "completed" } }),
+            JSON.stringify({ type: "item.completed", item: { text: "MCP_AGENT_CLI_CODEX_SANDBOX_OK" } })
+          ].join("\n") + "\n");
+        }
+      });
+
+      expect(result).toMatchObject({
+        sandbox_bootstrap_verified: true,
+        sandboxed_operation_verified: true
+      });
+      await expect(access(probeFile)).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(access(probeRoot)).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects a sandbox probe artifact with extra content", async () => {
+    await expect(runCodexSandboxVerification({
+      cliPath: "codex.exe",
+      cwd: "C:\\Repos\\Example",
+      capabilities: { cd_flag: "--cd" },
+      env: {},
+      timeoutMs: 30_000,
+      maxOutputBytes: 65_536,
+      probeId: "wrong-content",
+      cleanupProbe: async () => {},
+      readProbeFile: async () => "MCP_AGENT_CLI_CODEX_SANDBOX_FILE_OK\nextra",
+      runCommand: async () => commandResult([
+        JSON.stringify({ type: "item.completed", item: { type: "file_change", status: "completed" } }),
+        JSON.stringify({ type: "item.completed", item: { text: "MCP_AGENT_CLI_CODEX_SANDBOX_OK" } })
+      ].join("\n") + "\n")
+    })).rejects.toMatchObject({ code: "CODEX_SANDBOX_OPERATION_NOT_VERIFIED" });
+  });
+
+  test("fails closed when read-only authentication succeeds but workspace-write helper bootstrap fails", async () => {
+    const help = "exec --json --sandbox -C, --cd --output-schema --output-last-message";
+    const runner = queuedRunner([
+      commandResult(`${HEAD}\n`),
+      commandResult(""),
+      commandResult("codex-cli 1.2.3\n"),
+      commandResult(help),
+      commandResult(help),
+      commandResult(`${JSON.stringify({ type: "item.completed", item: { text: "MCP_AGENT_CLI_CODEX_PROBE_OK" } })}\n`),
+      commandResult(`${JSON.stringify({
+        type: "item.completed",
+        item: {
+          type: "command_execution",
+          status: "failed",
+          exit_code: -1,
+          aggregated_output: "windows sandbox: orchestrator_helper_launch_failed helper=codex-windows-sandbox-setup.exe error=program not found"
+        }
+      })}\n`, {
+        stderr: "failed to spawn codex-windows-sandbox-setup.exe\n"
+      }),
+      commandResult(`${HEAD}\n`),
+      commandResult("")
+    ]);
+    let cleanupCalls = 0;
+
+    await expect(probeAgentCli({
+      provider: "codex",
+      cwd: "C:\\Repos\\Example",
+      runCommand: runner.run,
+      resolveCli: async () => "C:\\Users\\fixture\\codex.exe",
+      probeId: "failed-helper",
+      readProbeFile: async () => { throw new Error("probe file must not be accepted"); },
+      cleanupProbe: async () => { cleanupCalls += 1; }
+    })).rejects.toMatchObject({
+      code: "CODEX_SANDBOX_BOOTSTRAP_FAILED",
+      details: { sandbox_failure_code: "orchestrator_helper_launch_failed" }
+    });
+
+    expect(cleanupCalls).toBe(2);
+    expect(runner.calls[5].input).toContain("MCP_AGENT_CLI_CODEX_PROBE_OK");
+    expect(runner.calls[6].args).toContain("workspace-write");
+    expect(runner.calls).toHaveLength(9);
+  });
+
+  test.each([
+    ["timeout", { timedOut: true, complete: false }, "CODEX_SANDBOX_PROBE_TIMED_OUT"],
+    ["truncation", { truncated: true, complete: false }, "CODEX_SANDBOX_PROBE_OUTPUT_INCOMPLETE"]
+  ])("fails closed on workspace-write probe %s", async (_label, failure, expectedCode) => {
+    const help = "exec --json --sandbox --cd";
+    const runner = queuedRunner([
+      commandResult(`${HEAD}\n`),
+      commandResult(""),
+      commandResult("codex-cli 1.2.3\n"),
+      commandResult(help),
+      commandResult(help),
+      commandResult(`${JSON.stringify({ type: "item.completed", item: { text: "MCP_AGENT_CLI_CODEX_PROBE_OK" } })}\n`),
+      commandResult("", failure),
+      commandResult(`${HEAD}\n`),
+      commandResult("")
+    ]);
+
+    await expect(probeAgentCli({
+      provider: "codex",
+      cwd: "C:\\Repos\\Example",
+      runCommand: runner.run,
+      resolveCli: async () => "codex.exe",
+      probeId: `probe-${_label}`,
+      cleanupProbe: async () => {}
+    })).rejects.toMatchObject({ code: expectedCode });
   });
 
   test("fails closed before launching an agent when the worktree is dirty", async () => {

@@ -78,6 +78,25 @@ describe("CodexExecutionService", () => {
     await expect(access(join(fixture.root, result.execution_path))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  test("fails closed when sandbox verification leaves the repository dirty", async () => {
+    const fixture = await createExecutionFixture();
+    const service = createService(fixture, {
+      verifyCli: async () => {
+        await writeFile(join(fixture.root, "src", "app.ts"), "export const probeLeak = true;\n");
+        return {
+          command: "codex",
+          version: "codex 1.0.0",
+          cd_flag: "--cd",
+          sandbox_bootstrap_verified: true,
+          sandboxed_operation_verified: true
+        };
+      }
+    });
+
+    await expect(service.start({ ...startInput(fixture), dry_run: true })).rejects.toMatchObject({ code: "GIT_WORKTREE_DIRTY" });
+    await expect(access(join(fixture.root, codexRunPaths(RUN_ID).executionPath))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   test("dedicated execution policy is disabled by default", async () => {
     const fixture = await createExecutionFixture();
     const service = createService(fixture, {}, new OperationsPolicy({ enabled: true }));
@@ -235,6 +254,13 @@ describe("CodexExecutionService", () => {
 
 type ExecutionFixture = { root: string; head: string; branch: string };
 type ServiceOverrides = {
+  verifyCli?: () => Promise<{
+    command: string;
+    version: string;
+    cd_flag: "--cd" | "-C";
+    sandbox_bootstrap_verified: true;
+    sandboxed_operation_verified: true;
+  }>;
   launchRunner?: (options: { root: string; repoId: string; runId: string; timeoutMs: number; maxOutputBytes: number; inheritEnv: string[] }) => Promise<{ pid: number }>;
   processAlive?: (pid: number) => boolean;
   terminateRunner?: (pid: number) => Promise<void>;
@@ -297,7 +323,13 @@ function createService(fixture: ExecutionFixture, overrides: ServiceOverrides = 
     new PathSandbox(fixture.root),
     policy,
     {
-      verifyCli: async () => ({ command: "codex", version: "codex 1.0.0", cd_flag: "--cd" }),
+      verifyCli: overrides.verifyCli ?? (async () => ({
+        command: "codex",
+        version: "codex 1.0.0",
+        cd_flag: "--cd",
+        sandbox_bootstrap_verified: true,
+        sandboxed_operation_verified: true
+      })),
       launchRunner: overrides.launchRunner ?? (async ({ root, runId }) => {
         const paths = codexRunPaths(runId);
         const starting = await readExecutionState(root, paths.executionPath);

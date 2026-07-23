@@ -15,6 +15,7 @@ import {
   terminateProcessTree
 } from "./agent-cli-probe.mjs";
 import { spawn } from "node:child_process";
+import { createCodexExecutionBoundaryTracker } from "./codex-execution-boundary.mjs";
 
 const RUN_ID = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{6}Z-[a-z0-9][a-z0-9-]{0,79}$/;
 const SHA = /^[a-f0-9]{40}$/;
@@ -51,11 +52,16 @@ export async function runCodexTaskRunner(rawOptions = parseArgs(process.argv.sli
   let timedOut = false;
   let truncated = false;
   let malformedJsonl = false;
+  let boundaryTracker;
 
   try {
     state = await readJson(paths.execution);
     assertStateIdentity(state, options);
     stateIdentityVerified = true;
+    boundaryTracker = createCodexExecutionBoundaryTracker({
+      sandboxRequested: state.sandbox_requested,
+      sandboxBootstrapVerified: state.sandbox_bootstrap_verified
+    });
     const promptBuffer = await readFile(paths.prompt);
     const prompt = decodeUtf8(promptBuffer, "PROMPT.md");
     const manifestBuffer = await readFile(paths.manifest);
@@ -82,10 +88,16 @@ export async function runCodexTaskRunner(rawOptions = parseArgs(process.argv.sli
     }
 
     await ensureNewOutputFiles(paths);
-    output = createBoundedOutput(paths, options.maxOutputBytes, () => {
-      truncated = true;
-      if (child) terminateTree(child);
-    });
+    output = createBoundedOutput(
+      paths,
+      options.maxOutputBytes,
+      () => {
+        truncated = true;
+        if (child) terminateTree(child);
+      },
+      (event) => boundaryTracker.observeEvent(event),
+      (stderr) => boundaryTracker.observeStderr(stderr)
+    );
     const args = ["exec", "--json", "--sandbox", "workspace-write", capabilities.cd_flag, options.repoRoot, "-"];
     const invocation = resolveExecutableInvocation(cli, args, process.platform);
     child = spawnProcess(invocation.command, invocation.args, {
@@ -117,7 +129,7 @@ export async function runCodexTaskRunner(rawOptions = parseArgs(process.argv.sli
     });
     child.stderr?.on("data", (chunk) => output.writeStderr(chunk));
     const processResult = await new Promise((resolveProcess, rejectProcess) => {
-      child.on("error", rejectProcess);
+      child.on("error", (error) => rejectProcess(runnerError("CODEX_PROCESS_START_FAILED", error instanceof Error ? error.message : "Codex process start failed.")));
       child.on("close", (code) => resolveProcess({ exitCode: typeof code === "number" ? code : null }));
       timer = setTimeout(() => {
         timedOut = true;
@@ -132,6 +144,10 @@ export async function runCodexTaskRunner(rawOptions = parseArgs(process.argv.sli
 
     const postflight = await inspectPostflight(options.repoRoot, manifest, paths, otherRunsBefore, branchRefsBefore, runIntegrityBefore, outputSizes);
     const result = await readResult(paths.result);
+    const boundary = boundaryTracker.finalize({
+      changedPaths: postflight.changedPaths,
+      resultPath: relative(options.repoRoot, paths.result).replaceAll("\\", "/")
+    });
     const endedAt = now().toISOString();
     let terminalStatus = "completed";
     let errorCode = null;
@@ -149,6 +165,16 @@ export async function runCodexTaskRunner(rawOptions = parseArgs(process.argv.sli
       terminalStatus = "failed";
       errorCode = "CODEX_OUTPUT_INVALID";
       diagnostic = "Codex emitted malformed JSONL output.";
+    } else if (boundary.sandbox_failure_detected) {
+      terminalStatus = "failed";
+      errorCode = "CODEX_SANDBOX_BOOTSTRAP_FAILED";
+      diagnostic = `The requested workspace-write sandbox failed (${boundary.sandbox_failure_code ?? "unknown sandbox failure"}).`;
+    } else if (!boundary.execution_boundary_verified) {
+      terminalStatus = "failed";
+      errorCode = "CODEX_EXECUTION_BOUNDARY_UNVERIFIED";
+      diagnostic = boundary.fallback_tool_violations.length > 0
+        ? `Codex used or may have used an unverified host execution path: ${boundary.fallback_tool_violations.join(", ")}.`
+        : "Codex execution boundary provenance could not be verified.";
     } else if (processResult.exitCode !== 0) {
       terminalStatus = "failed";
       errorCode = "CODEX_PROCESS_NONZERO_EXIT";
@@ -187,7 +213,14 @@ export async function runCodexTaskRunner(rawOptions = parseArgs(process.argv.sli
       forbidden_path_changes: postflight.forbiddenChanges,
       result_sha256: result.valid ? result.sha256 : null,
       result_bytes: result.valid ? result.bytes : null,
-      result_status: result.valid ? result.status : null
+      result_status: result.valid ? result.status : null,
+      sandbox_requested: boundary.sandbox_requested,
+      sandbox_bootstrap_verified: boundary.sandbox_bootstrap_verified,
+      sandbox_failure_detected: boundary.sandbox_failure_detected,
+      sandbox_failure_code: boundary.sandbox_failure_code,
+      execution_boundary_verified: boundary.execution_boundary_verified,
+      fallback_tool_violations: boundary.fallback_tool_violations,
+      execution_warnings: boundary.warnings
     };
     await writeJsonAtomic(paths.execution, state);
     return state;
@@ -198,6 +231,10 @@ export async function runCodexTaskRunner(rawOptions = parseArgs(process.argv.sli
     if (!stateIdentityVerified) throw error;
     const endedAt = now().toISOString();
     const postflight = await inspectGit(options.repoRoot).catch(() => ({ branch: null, head: null, clean: null, changedPaths: [] }));
+    const boundary = boundaryTracker?.finalize({
+      changedPaths: postflight.changedPaths,
+      resultPath: state?.result_path
+    });
     state = {
       ...state,
       status: "failed",
@@ -214,7 +251,16 @@ export async function runCodexTaskRunner(rawOptions = parseArgs(process.argv.sli
       worktree_clean_after: postflight.clean,
       changed_paths: postflight.changedPaths,
       scope_violations: [],
-      forbidden_path_changes: []
+      forbidden_path_changes: [],
+      ...(boundary ? {
+        sandbox_requested: boundary.sandbox_requested,
+        sandbox_bootstrap_verified: boundary.sandbox_bootstrap_verified,
+        sandbox_failure_detected: boundary.sandbox_failure_detected,
+        sandbox_failure_code: boundary.sandbox_failure_code,
+        execution_boundary_verified: false,
+        fallback_tool_violations: boundary.fallback_tool_violations,
+        execution_warnings: boundary.warnings
+      } : {})
     };
     await writeJsonAtomic(paths.execution, state).catch(() => {});
     return state;
@@ -270,6 +316,9 @@ function assertStateIdentity(state, options) {
   if (state?.schema_version !== 1 || state?.status !== "starting" || state?.repo_id !== options.repoId || state?.run_id !== options.runId || (state?.runner_pid && state.runner_pid !== process.pid)) {
     throw runnerError("CODEX_EXECUTION_INVALID", "Starting execution state does not match this runner.");
   }
+  if (state?.boundary_evidence_version !== 1 || state?.sandbox_requested !== "workspace-write" || state?.sandbox_bootstrap_verified !== true) {
+    throw runnerError("CODEX_SANDBOX_BOOTSTRAP_UNVERIFIED", "Durable execution cannot start without verified workspace-write sandbox bootstrap evidence.");
+  }
 }
 
 function validateManifest(manifest, options, paths, promptBuffer) {
@@ -320,7 +369,7 @@ async function ensureNewOutputFiles(paths) {
   await writeFile(paths.stderr, "", { encoding: "utf8", flag: "wx" }).catch((error) => { throw runnerError("CODEX_OUTPUT_EXISTS", error.message); });
 }
 
-function createBoundedOutput(paths, maxBytes, onLimit) {
+function createBoundedOutput(paths, maxBytes, onLimit, onEvent = () => {}, onStderr = () => {}) {
   const stdout = createWriteStream(paths.stdout, { flags: "a", encoding: "utf8" });
   const stderr = createWriteStream(paths.stderr, { flags: "a", encoding: "utf8" });
   let bytes = 0;
@@ -363,17 +412,32 @@ function createBoundedOutput(paths, maxBytes, onLimit) {
       stdoutPending = lines.pop() ?? "";
       for (const line of lines) {
         if (!line) continue;
-        try { JSON.parse(line); } catch { malformed = true; malformedInChunk = true; }
+        try {
+          const event = JSON.parse(line);
+          onEvent(event);
+        } catch {
+          malformed = true;
+          malformedInChunk = true;
+        }
         writeBounded(stdout, `${line}\n`, "stdout");
       }
       return { malformed: malformedInChunk };
     },
-    writeStderr(chunk) { writeBounded(stderr, String(chunk ?? ""), "stderr"); },
+    writeStderr(chunk) {
+      const text = String(chunk ?? "");
+      onStderr(text);
+      writeBounded(stderr, text, "stderr");
+    },
     async close() {
       if (closed) return;
       closed = true;
       if (stdoutPending) {
-        try { JSON.parse(stdoutPending); } catch { malformed = true; }
+        try {
+          const event = JSON.parse(stdoutPending);
+          onEvent(event);
+        } catch {
+          malformed = true;
+        }
         writeBounded(stdout, `${stdoutPending}\n`, "stdout");
       }
       await Promise.all([endStream(stdout), endStream(stderr)]);
