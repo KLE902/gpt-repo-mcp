@@ -12,7 +12,7 @@ GPT Repo MCP (`gpt-repo-mcp`) is a tool-only MCP server. There is no widget in v
 - `src/tools/catalog.ts` is metadata plus handler wiring only.
 - `src/tools/define-tool.ts` converts contract objects to MCP SDK schemas and registers metadata.
 - `src/tools/handlers.ts` contains thin adapters from tool input to services.
-- `src/services/*` contains filesystem, git, search, tree, read, write, project, task, decision, and advisory planning logic.
+- `src/services/*` contains filesystem, git, search, tree, read, write, project, task, decision, durable Codex execution/review, and advisory planning logic.
 - `src/policies/*` contains shared limits, excludes, write defaults, and secret patterns.
 - `src/runtime/*` contains context, structured errors, result envelopes, and audit logging.
 - `scripts/runtime-supervisor.mjs` is the optional out-of-process Windows lifecycle owner for the compiled MCP server and ngrok.
@@ -63,6 +63,32 @@ Git recovery is separate from write tools. `repo_write_file` and `repo_write_cha
 The preferred high-level mutation flow is `repo_git_review` followed by the review-provided `repo_write_stage_commit` or `repo_write_recover` payload within the already authorized implementation or recovery task. Granular tools remain available for specific requested operations, staged-only commits, troubleshooting, or cases where composite payloads are absent.
 
 When work starts on a base branch, the reviewed delivery continuation begins with `repo_write_create_branch`, which creates a new branch from the exact current source branch and HEAD and may carry reviewed index/worktree state. Existing clean branches can be inspected with `repo_git_branches` and opened with `repo_write_switch_branch` under separate branch-management policy. After local review and commit, delivery continues through `repo_write_push` → `repo_write_pull_request` → `repo_remote_status`. `repo_remote_pull_requests` provides bounded repository-wide PR listing through fixed structured GitHub CLI arguments. Draft-ready remains a fixed allowlisted GitHub CLI wrapper. An explicitly owner-approved open, unmerged PR can be closed with `repo_write_retire_pull_request`; the tool verifies the exact PR head SHA, confirms no other open PR uses the head branch, invokes `gh pr close` without `--delete-branch`, verifies closure, and then delegates exact local and origin ref cleanup to the existing guarded Git layer. The normal merge flow stops for explicit owner approval before `repo_write_merge_pull_request`. After GitHub confirms the merge, `repo_write_finalize_pull_request` can synchronize and switch to the base and delete only refs proven to match the exact merged PR head. Remote state changes use exact local, branch, ref, and pull-request head guards. `repo_write_dispatch_workflow` and `repo_run_allowed_script` provide bounded remote and local validation without accepting caller-supplied commands.
+
+## Durable Codex execution
+
+The Codex path is deliberately split into task creation, bounded start, detached execution, and read-only review:
+
+```text
+repo_write_codex_task
+  -> PROMPT.md + schema-v2 run.json
+repo_start_codex_task
+  -> CodexExecutionService preflight
+  -> execution.json starting
+  -> detached scripts/codex-task-runner.mjs
+repo_codex_review
+  -> CodexReviewService
+  -> execution state + legacy result reader + GitReviewService
+```
+
+`CodexExecutionService` owns caller-facing preflight. It verifies exact branch and HEAD, clean non-base state, exact run paths and manifest identity, prompt SHA-256, non-empty allowed paths, absent prior execution/result/output artifacts, gitignored local artifacts, single-writer ownership, and required Codex CLI capabilities. The caller supplies no command, arguments, prompt, model, sandbox, runtime, environment, working directory, or delivery behavior.
+
+The service writes a durable `starting` state and launches `scripts/codex-task-runner.mjs` as a detached Node process. The MCP request returns after the runner records `running` or a terminal state; the complete Codex lifetime is not coupled to one connector request. A repository has at most one active Codex writer through `.chatgpt/codex-runs/.active-codex.lock`. A stale lock is replaceable only after process absence is verified. There is no central registry, queue, broker, or database.
+
+Each run owns local gitignored artifacts under its exact directory: `execution.json`, `stdout.jsonl`, `stderr.log`, and `RESULT.md`. State transitions are safe and bounded. The runner uses the shared verified CLI resolution and process layer, fixed non-interactive JSONL arguments, `workspace-write`, the exact repository root, prompt input via stdin, a restricted environment, bounded redacted output, and complete process-tree termination at timeout.
+
+Postflight compares the actual branch, HEAD, Git paths, forbidden scope, and other run directories against the starting contract. It validates UTF-8 result structure and accepts only `completed` or `blocked` as successful terminal outcomes. Violations become `failed`; the runner records evidence and never restores, stages, commits, pushes, branches, merges, retries, or starts another run automatically.
+
+`CodexReviewService` composes durable execution state with the existing manual result parser and `GitReviewService`. Active runs return process activity and provenance without requiring manual relay. Terminal success returns parsed result plus Git review. Failure and timeout return safe diagnostics and the same guarded recovery payloads as normal change review. Runs without `execution.json` continue through the legacy manual result path.
 
 ## Runtime Supervision
 

@@ -16,7 +16,8 @@ import { ProjectBriefService } from "../services/project-brief-service.js";
 import { TaskInventoryService } from "../services/task-inventory-service.js";
 import { DecisionLogService } from "../services/decision-log-service.js";
 import { ChangePlanService } from "../services/change-plan-service.js";
-import { CodexResultService } from "../services/codex-result-service.js";
+import { CodexExecutionService } from "../services/codex-execution-service.js";
+import { CodexReviewService } from "../services/codex-review-service.js";
 import { CodexTaskService } from "../services/codex-task-service.js";
 import { NextActionService } from "../services/next-action-service.js";
 import { PolicyExplainService } from "../services/policy-explain-service.js";
@@ -38,7 +39,7 @@ import type { ProjectBriefInput } from "../contracts/project.contract.js";
 import type { TaskInventoryInput } from "../contracts/task.contract.js";
 import type { DecisionLogInput } from "../contracts/decision.contract.js";
 import type { ChangePlanInput } from "../contracts/change-plan.contract.js";
-import type { CodexReviewInput, CodexTaskInput, CodexTaskWriteInput } from "../contracts/codex-task.contract.js";
+import type { CodexReviewInput, CodexStartInput, CodexTaskInput, CodexTaskWriteInput } from "../contracts/codex-task.contract.js";
 import type { NextActionInput } from "../contracts/next-action.contract.js";
 import type { LastWriteInput } from "../contracts/operation-receipt.contract.js";
 import type { PolicyExplainInput } from "../contracts/policy.contract.js";
@@ -424,9 +425,29 @@ export const writeCodexTaskHandler: ToolHandler = async (input, context) => safe
   );
 });
 
+export const startCodexTaskHandler: ToolHandler = async (input, context) => safeTool<CodexStartInput>("repo_start_codex_task", input, context, async (args) => {
+  const repo = context.registry.get(args.repo_id);
+  const result = await new CodexExecutionService(
+    repo.root,
+    new PathSandbox(repo.root),
+    new OperationsPolicy(repo.operations)
+  ).start(args);
+  audit({
+    tool: "repo_start_codex_task",
+    repo_id: args.repo_id,
+    paths: [result.execution_path, result.stdout_path, result.stderr_path],
+    warnings: result.warnings
+  });
+  return createSuccessEnvelope(
+    result,
+    result.dry_run ? `Dry run validated Codex task ${result.run_id}.` : result.started ? `Started Codex task ${result.run_id}.` : `Codex task ${result.run_id} reached a terminal state during startup.`,
+    { warnings: result.warnings }
+  );
+});
+
 export const codexReviewHandler: ToolHandler = async (input, context) => safeTool<CodexReviewInput>("repo_codex_review", input, context, async (args) => {
   const repo = context.registry.get(args.repo_id);
-  const result = await new CodexResultService(
+  const result = await new CodexReviewService(
     new PathSandbox(repo.root),
     new GitReviewService(repo.root, new OperationsPolicy(repo.operations))
   ).review(args);

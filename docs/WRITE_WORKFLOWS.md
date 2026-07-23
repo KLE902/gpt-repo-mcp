@@ -190,9 +190,9 @@ Low-level tools remain available for granular control, absent composite payloads
 
 Direct implementation is the default when the user asks ChatGPT to fix, implement, update, or edit code. Use Codex task tools only when the user explicitly asks for a Codex prompt, Codex task, delegation to Codex, or a repo-local Codex run.
 
-For repo-local Codex delegation, call `repo_write_codex_task` by default. Use it whenever Codex will receive an instruction like `Implement .chatgpt/codex-runs/<run_id>/PROMPT.md`; it writes the prompt file before Codex runs.
+### Chat-copy mode
 
-For chat-copy mode, call `repo_prepare_codex_task` only when the user wants to review or copy the prompt in chat. It returns a complete Codex prompt in `prompt_markdown` and does not write files:
+Use `repo_prepare_codex_task` only when the user wants to review or copy a prompt in chat and no repo-local run should be created. It returns `prompt_markdown` but writes no files and starts no process:
 
 ```json
 {
@@ -205,20 +205,56 @@ For chat-copy mode, call `repo_prepare_codex_task` only when the user wants to r
 }
 ```
 
-For repo-local mode, `repo_write_codex_task` writes:
+### Durable repo-local mode
+
+The intended flow is:
+
+1. Inspect the repository and establish current branch, HEAD, and worktree state.
+2. Create a non-base feature branch when needed.
+3. Call `repo_write_codex_task` to create a new run with `PROMPT.md` and schema-v2 `run.json`.
+4. Call `repo_start_codex_task` with the exact `run_id`, feature branch, and HEAD.
+5. Call `repo_codex_review` to read status; repeat in a later ChatGPT turn when the run is still active.
+6. ChatGPT reviews the actual diff and the verified result together.
+7. ChatGPT runs relevant external verification through the normal bounded tools.
+8. After a good review, ChatGPT stages, commits, pushes, and creates or updates the pull request through the normal guarded delivery flow.
+9. The owner decides whether the pull request should merge.
+
+`repo_write_codex_task` writes only:
 
 - `.chatgpt/codex-runs/<run_id>/PROMPT.md`
 - `.chatgpt/codex-runs/<run_id>/run.json`
 
-Give Codex the returned `codex_user_prompt`, for example:
+The manifest includes repository/run identity, exact prompt/result paths, prompt SHA-256, allowed paths, forbidden paths, verification commands, and existing task metadata. The writer refuses to reuse a run directory containing any task, execution, output, or result artifact.
 
-```text
-Implement .chatgpt/codex-runs/<run_id>/PROMPT.md
+`repo_start_codex_task` accepts only `repo_id`, `run_id`, `expected_branch`, `expected_head_sha`, optional `dry_run`, and optional `reason`. It does not accept prompt text, command, arguments, model, reasoning level, sandbox, timeout, environment, working directory, verification commands, provider, or Git delivery instructions. Those values are fixed by implementation and local policy.
+
+Before start, the tool requires a clean non-base branch, exact HEAD, a valid executable task manifest, a matching prompt hash, non-empty allowed paths, absent prior result/execution/output artifacts, gitignored execution files, no active repository Codex writer, and verified Codex CLI capabilities. The runner uses fixed non-interactive JSONL output, `workspace-write`, the exact repository root, and prompt input through stdin.
+
+The short MCP start call launches a separate bounded runner and returns once the runner confirms `running` or reaches a terminal state. It does not keep the connector request open for the complete Codex run. A connector or client timeout after the runner has started does not remove local execution state or trigger an automatic retry. Call `repo_codex_review` again with the same `run_id` to recover durable truth.
+
+The exact run directory may contain `execution.json`, `stdout.jsonl`, `stderr.log`, and `RESULT.md`. Execution states are `starting`, `running`, `completed`, `blocked`, `failed`, and `timed_out`. `blocked` is a valid terminal result when no execution contract was violated. Timeout kills the complete Codex process tree, preserves bounded redacted output, records the terminal state, and never restarts automatically.
+
+Postflight verifies branch, HEAD, changed paths, forbidden paths, other run directories, result UTF-8/status, and output completeness. A violation is reported as `failed`; evidence is preserved and no automatic restore occurs. Use the returned Git review and normal guarded recovery tools to decide what to retain.
+
+Legacy manually run Codex tasks remain compatible. When `execution.json` is absent, `repo_codex_review` continues to read `RESULT.md` and the Git review as before.
+
+### Local execution policy
+
+Durable Codex execution is a separate opt-in and remains disabled by default. Configure it only in local configuration after the MCP version supporting these fields is running:
+
+```json
+{
+  "operations": {
+    "enabled": true,
+    "codex_task_run_enabled": false,
+    "codex_task_max_runtime_ms": 1800000,
+    "codex_task_max_output_bytes": 1048576,
+    "codex_task_inherit_env": []
+  }
+}
 ```
 
-The generated prompt tells Codex to write `.chatgpt/codex-runs/<run_id>/RESULT.md` before its final chat response. After Codex finishes, call `repo_codex_review` with the same `run_id`; it reads `RESULT.md`, runs git review logic, and returns review/recovery/commit next-tool payloads. If `RESULT.md` is missing, ask the user to paste Codex output or rerun Codex with the prompt completion contract.
-
-Codex task files are local ChatGPT working state under `.chatgpt/` and normally should not be committed.
+The maximum runtime, output limit, and environment names are server-owned. Do not commit local activation or real credentials. Codex task and execution artifacts are local working state under `.chatgpt/` and normally should not be committed.
 
 ## ChatGPT Handoff Workflow
 

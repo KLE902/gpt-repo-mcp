@@ -33,6 +33,10 @@ export const OperationsPolicyConfigSchema = z.object({
   git_sync_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.git_sync_enabled),
   script_run_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.script_run_enabled),
   allowed_scripts: z.record(z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/), AllowedScriptConfigSchema).default(DEFAULT_OPERATIONS_POLICY.allowed_scripts),
+  codex_task_run_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.codex_task_run_enabled),
+  codex_task_max_runtime_ms: z.number().int().min(1000).max(7_200_000).default(DEFAULT_OPERATIONS_POLICY.codex_task_max_runtime_ms),
+  codex_task_max_output_bytes: z.number().int().min(1024).max(1_048_576).default(DEFAULT_OPERATIONS_POLICY.codex_task_max_output_bytes),
+  codex_task_inherit_env: z.array(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/)).max(64).default(DEFAULT_OPERATIONS_POLICY.codex_task_inherit_env),
   max_paths_per_operation: PositiveIntSchema.default(DEFAULT_OPERATIONS_POLICY.max_paths_per_operation),
   cleanup_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.cleanup_enabled),
   cleanup_allowed_globs: z.array(z.string()).default(DEFAULT_OPERATIONS_POLICY.cleanup_allowed_globs)

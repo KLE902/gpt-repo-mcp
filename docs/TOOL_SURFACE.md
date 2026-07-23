@@ -589,12 +589,12 @@ Example:
 
 ### `repo_write_codex_task`
 
-Writes a repo-local Codex task prompt under `.chatgpt/codex-runs/<run_id>/`. Use this by default for repo-local Codex delegation, start/resume flows, or any handoff where Codex will receive `Implement .chatgpt/codex-runs/<run_id>/PROMPT.md`. It writes only `PROMPT.md` and `run.json` through the normal write policy. It does not implement code, run Codex, stage, commit, push, or execute shell commands.
+Writes a new repo-local Codex task under `.chatgpt/codex-runs/<run_id>/`. It writes only `PROMPT.md` and schema-v2 `run.json` through the normal write policy and refuses to overwrite any existing task, result, execution, stdout, or stderr artifact. The manifest records repository/run identity, exact prompt/result paths, prompt SHA-256, allowed paths, forbidden paths, verification commands, and existing task metadata. It does not implement code, run Codex, stage, commit, push, or execute shell commands.
 
 Input: same task fields as `repo_prepare_codex_task`, plus optional `dry_run` and `reason`.
 Output: all prepare fields plus `dry_run` and `written_paths[]`.
 
-After this tool, give Codex the returned `codex_user_prompt`, for example `Implement .chatgpt/codex-runs/<run_id>/PROMPT.md`. The prompt's completion contract tells Codex to write `.chatgpt/codex-runs/<run_id>/RESULT.md` before its final chat response.
+After this tool, call `repo_start_codex_task` when dedicated local execution policy is enabled, or use the returned `codex_user_prompt` for the legacy manual flow. The prompt completion contract tells Codex to write `.chatgpt/codex-runs/<run_id>/RESULT.md`.
 Example:
 
 ```json
@@ -607,14 +607,43 @@ Example:
 }
 ```
 
+### `repo_start_codex_task`
+
+Starts only an existing verified `repo_write_codex_task` run. It requires the dedicated disabled-by-default local execution opt-in, exact branch and HEAD guards, a clean non-base branch, matching manifest identity and prompt SHA-256, a non-empty allowed-path scope, absent prior result/execution/output artifacts, gitignored execution paths, no active repository Codex writer, and verified Codex CLI capabilities.
+
+Input: `repo_id`, `run_id`, `expected_branch`, `expected_head_sha`, optional `dry_run`, and optional `reason`.
+
+The input contract deliberately excludes prompt text, command, argument list, model, reasoning level, sandbox, timeout, environment, provider, working directory, verification commands, and Git delivery instructions. The implementation and local policy own those values.
+
+A real start creates `execution.json`, starts a separate bounded runner, and returns after the runner confirms `running` or reaches a terminal state. The runner invokes fixed Codex non-interactive JSONL execution with `workspace-write`, the exact repository root, prompt input through stdin, `shell: false`, `windowsHide`, a restricted environment, bounded redacted stdout/stderr, and process-tree termination at timeout.
+
+Output: validation/start flags, exact execution/stdout/stderr paths, fixed invocation metadata, optional current execution state, next steps, and warnings. A long-running task is reread through `repo_codex_review`; the start call is not kept open for the complete Codex execution and no automatic retry occurs.
+
+Example dry run:
+
+```json
+{
+  "repo_id": "example-repo",
+  "run_id": "2026-06-04T081500Z-fix-login-expiry",
+  "expected_branch": "feat/fix-login-expiry",
+  "expected_head_sha": "0123456789abcdef0123456789abcdef01234567",
+  "dry_run": true
+}
+```
+
 ### `repo_codex_review`
 
-Reads `.chatgpt/codex-runs/<run_id>/RESULT.md` and the current git diff review state. Use this after Codex finishes a repo-local Codex run. It is read-only and returns the parsed Codex result plus the same review payload style used by `repo_git_review`.
+Reads durable execution state when present and preserves legacy manual `RESULT.md` compatibility when it is absent.
 
 Input: `repo_id`, `run_id`, optional `max_files`.
-Output: `result_found`, optional `codex_result`, optional `git_review`, optional `next_tool_payloads`, `next_steps[]`, and `warnings[]`.
 
-If `RESULT.md` is missing, the tool returns `CODEX_RESULT_MISSING` and asks the user to paste Codex output or rerun Codex with the prompt completion contract.
+For `starting` or `running`, output includes execution identity, branch/SHA provenance, runner/process identity, current process activity, bounded state, and a later-reread instruction. It does not ask for manual prompt or result relay.
+
+For `completed` or `blocked`, output includes execution state, parsed `RESULT.md`, Git review, changed paths, scope/forbidden-path findings, and the normal review-provided commit or recovery payloads.
+
+For `failed` or `timed_out`, output includes terminal state, safe diagnostics, branch/HEAD/worktree assessment, Git review when changes exist, and guarded recovery payloads. Evidence is preserved; review does not restore files automatically.
+
+When no `execution.json` exists, the previous manual behavior remains: the tool reads `RESULT.md` and Git review, or reports `CODEX_RESULT_MISSING` for an unfinished legacy run.
 Example:
 
 ```json

@@ -286,7 +286,8 @@ export function buildAgentEnvironment(
   provider,
   source = globalThis.process.env,
   platform = globalThis.process.platform,
-  fileExists = existsSync
+  fileExists = existsSync,
+  extraAllowedNames = []
 ) {
   const allowedNames = new Set([
     "PATH",
@@ -319,6 +320,10 @@ export function buildAgentEnvironment(
     allowedNames.add("npm_execpath");
   } else {
     throw operationError("PROVIDER_NOT_SUPPORTED", `Unsupported provider: ${provider}`);
+  }
+
+  for (const name of extraAllowedNames) {
+    if (typeof name === "string" && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) allowedNames.add(name);
   }
 
   const result = {};
@@ -431,12 +436,15 @@ function containsExactString(value, expected) {
   return Object.values(value).some((item) => containsExactString(item, expected));
 }
 
-export function sanitizeDiagnosticText(value) {
+export function redactAgentOutput(value) {
   return String(value ?? "")
     .replace(/\b(?:sk|ghp|github_pat|glpat|xox[baprs])-[-A-Za-z0-9_]{8,}\b/gi, "<redacted-token>")
     .replace(/\b(Bearer|Basic)\s+[^\s]+/gi, "$1 <redacted>")
-    .replace(/\b(api[_-]?key|token|password|secret)\s*[:=]\s*[^\s,;]+/gi, "$1=<redacted>")
-    .slice(-2048);
+    .replace(/\b(api[_-]?key|token|password|secret)\s*[:=]\s*[^\s,;"']+/gi, "$1=<redacted>");
+}
+
+export function sanitizeDiagnosticText(value) {
+  return redactAgentOutput(value).slice(-2048);
 }
 
 function requireCapabilities(provider, capabilities, required) {
@@ -577,7 +585,7 @@ function windowsCommandInvocation(executable, args) {
   };
 }
 
-function terminateProcessTree(child) {
+export function terminateProcessTree(child) {
   if (!child || child.killed) return;
   if (globalThis.process.platform === "win32" && child.pid) {
     execFile("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true }, () => {});
