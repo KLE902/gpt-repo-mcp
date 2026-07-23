@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import {
   extractClaudeStructuredResult,
+  isAllowedCandidateCommitCount,
   isAllowedPkrPath,
   parseCodexResult,
   reviewSchema,
@@ -16,9 +17,21 @@ describe("PKR-003 fixed pilot runner", () => {
     expect(isAllowedPkrPath("app/src/androidTest/java/example/ContextTest.kt")).toBe(true);
     expect(isAllowedPkrPath("docs/premium-reference/capability-accessibility-matrix.md")).toBe(true);
     expect(isAllowedPkrPath("FEATURES.md")).toBe(true);
-    expect(isAllowedPkrPath("PROJECT_STATE.md")).toBe(false);
+    expect(isAllowedPkrPath("PROJECT_STATE.md")).toBe(true);
+    expect(isAllowedPkrPath("DEVELOPMENT_BACKLOG.md")).toBe(true);
+    expect(isAllowedPkrPath("docs/multiagent-workflow/pilots/PKR-003.md")).toBe(true);
+    expect(isAllowedPkrPath("README.md")).toBe(false);
     expect(isAllowedPkrPath("app/src/main/java/example/Context.java")).toBe(false);
     expect(isAllowedPkrPath("../outside.kt")).toBe(false);
+  });
+
+  test("allows the initial candidate plus at most two append-only follow-up commits", () => {
+    expect(isAllowedCandidateCommitCount(1)).toBe(true);
+    expect(isAllowedCandidateCommitCount(2)).toBe(true);
+    expect(isAllowedCandidateCommitCount(3)).toBe(true);
+    expect(isAllowedCandidateCommitCount(0)).toBe(false);
+    expect(isAllowedCandidateCommitCount(4)).toBe(false);
+    expect(isAllowedCandidateCommitCount(1.5)).toBe(false);
   });
 
   test("parses exact executor identity fields", () => {

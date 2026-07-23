@@ -25,8 +25,12 @@ export function isAllowedPkrPath(input) {
   if (!value || value.startsWith("/") || value.includes("../") || value.includes("\0")) return false;
   if ([
     "docs/premium-reference/capability-accessibility-matrix.md",
+    "docs/multiagent-workflow/README.md",
+    "docs/multiagent-workflow/pilots/PKR-003.md",
+    "DEVELOPMENT_BACKLOG.md",
     "FEATURES.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "PROJECT_STATE.md"
   ].includes(value)) return true;
   return [
     "app/src/main/",
@@ -34,6 +38,10 @@ export function isAllowedPkrPath(input) {
     "app/src/testDebug/",
     "app/src/androidTest/"
   ].some((prefix) => value.startsWith(prefix)) && value.endsWith(".kt");
+}
+
+export function isAllowedCandidateCommitCount(count) {
+  return Number.isInteger(count) && count >= 1 && count <= 3;
 }
 
 export function parseCodexResult(markdown) {
@@ -200,13 +208,17 @@ async function changedPaths(cwd, fromSha, toSha) {
 
 async function validateCandidate(cwd, candidateSha) {
   if (!SHA_PATTERN.test(candidateSha)) throw pilotError("CANDIDATE_SHA_INVALID", "Candidate SHA is invalid.");
-  const count = Number((await runGit(cwd, ["rev-list", "--count", `${START_SHA}..${candidateSha}`])).trim());
-  if (count !== 1) {
-    throw pilotError("CANDIDATE_COMMIT_COUNT_INVALID", "Executor must create exactly one append-only candidate commit.", { count });
+  const ancestry = await executeCommand("git", ["merge-base", "--is-ancestor", START_SHA, candidateSha], {
+    cwd,
+    timeoutMs: 30_000,
+    maxOutputBytes: 65_536
+  });
+  if (ancestry.exitCode !== 0 || ancestry.timedOut || ancestry.truncated || ancestry.complete === false) {
+    throw pilotError("CANDIDATE_ANCESTRY_INVALID", "Candidate is not an append-only descendant of the exact pilot start SHA.");
   }
-  const parent = (await runGit(cwd, ["rev-parse", `${candidateSha}^`])).trim().toLowerCase();
-  if (parent !== START_SHA) {
-    throw pilotError("CANDIDATE_PARENT_INVALID", "Candidate commit is not directly based on the exact pilot start SHA.");
+  const count = Number((await runGit(cwd, ["rev-list", "--count", `${START_SHA}..${candidateSha}`])).trim());
+  if (!isAllowedCandidateCommitCount(count)) {
+    throw pilotError("CANDIDATE_COMMIT_COUNT_INVALID", "Pilot candidate must contain one to three append-only commits.", { count });
   }
   const paths = await changedPaths(cwd, START_SHA, candidateSha);
   if (paths.length === 0) throw pilotError("CANDIDATE_DIFF_EMPTY", "Candidate commit contains no tracked changes.");
@@ -300,7 +312,7 @@ async function runExecutor(cwd) {
 function buildReviewPrompt(candidateSha, paths, executorResult, diff) {
   return [
     "You are the independent read-only reviewer for the owner-approved PKR-003 controlled pilot.",
-    `Review only candidate SHA ${candidateSha}, whose direct parent is ${START_SHA}.`,
+    `Review only candidate SHA ${candidateSha}, which is an append-only descendant of pilot start SHA ${START_SHA}.`,
     `The product baseline is ${BASE_SHA}.`,
     "Attempt to falsify the candidate against docs/multiagent-workflow/pilots/PKR-003.md, AGENTS.md, the actual code, tests, and the supplied executor evidence.",
     "Do not modify files. Do not run shell commands. Use only read/search tools. Do not create commits, branches, comments, or external effects.",
