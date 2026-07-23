@@ -124,6 +124,77 @@ describe("CodexReviewService", () => {
     expect(result.next_steps.join(" ")).toMatch(/recovery/i);
   });
 
+  test("surfaces sandbox failure and boundary evidence even when the Git diff is correct", async () => {
+    const fixture = await createFixture();
+    await writeFile(join(fixture.root, "src", "app.ts"), "export const app = 'correct but unsafe';\n");
+    const evidence = await writeResult(fixture, "completed");
+    await writeExecution(fixture, state(fixture, "failed", {
+      started_at: NOW,
+      ended_at: NOW,
+      exit_code: 0,
+      output_complete: true,
+      worktree_clean_after: false,
+      changed_paths: ["src/app.ts"],
+      result_sha256: evidence.sha256,
+      result_bytes: evidence.bytes,
+      result_status: "completed",
+      sandbox_failure_detected: true,
+      sandbox_failure_code: "orchestrator_helper_launch_failed",
+      execution_boundary_verified: false,
+      error_code: "CODEX_SANDBOX_BOOTSTRAP_FAILED",
+      diagnostic: "The requested workspace-write sandbox failed."
+    }));
+
+    const result = await reviewService(fixture, () => false).review({ repo_id: "demo", run_id: RUN_ID });
+
+    expect(result).toMatchObject({
+      execution_state: { status: "failed", exit_code: 0 },
+      execution_boundary: {
+        requested_sandbox: "workspace-write",
+        sandbox_bootstrap_verified: true,
+        sandbox_failure_detected: true,
+        sandbox_failure_code: "orchestrator_helper_launch_failed",
+        execution_boundary_verified: false
+      },
+      git_review: { ok: true }
+    });
+    expect(result.execution_boundary?.classification_reason).toMatch(/sandbox failed/i);
+    expect(result.warnings).toContain("CODEX_SANDBOX_BOOTSTRAP_FAILED");
+    expect(result.codex_result).toBeUndefined();
+  });
+
+  test("treats older completed durable state without boundary evidence as unverified", async () => {
+    const fixture = await createFixture();
+    const evidence = await writeResult(fixture, "completed");
+    await writeExecution(fixture, state(fixture, "completed", {
+      started_at: NOW,
+      ended_at: NOW,
+      exit_code: 0,
+      output_complete: true,
+      result_sha256: evidence.sha256,
+      result_bytes: evidence.bytes,
+      result_status: "completed",
+      boundary_evidence_version: null,
+      sandbox_requested: null,
+      sandbox_bootstrap_verified: false,
+      execution_boundary_verified: false
+    }));
+
+    const result = await reviewService(fixture, () => false).review({ repo_id: "demo", run_id: RUN_ID });
+
+    expect(result.execution_boundary).toMatchObject({
+      requested_sandbox: null,
+      sandbox_bootstrap_verified: false,
+      execution_boundary_verified: false
+    });
+    expect(result.execution_boundary?.classification_reason).toMatch(/older durable execution state/i);
+    expect(result.warnings).toEqual(expect.arrayContaining([
+      "CODEX_EXECUTION_BOUNDARY_UNVERIFIED",
+      "CODEX_LEGACY_EXECUTION_STATE"
+    ]));
+    expect(result.codex_result).toBeUndefined();
+  });
+
   test("preserves legacy manual RESULT.md compatibility when execution.json is absent", async () => {
     const fixture = await createFixture();
     await writeResult(fixture, "completed");
@@ -211,6 +282,14 @@ function state(fixture: Fixture, status: CodexExecutionState["status"], override
     result_sha256: null,
     result_bytes: null,
     result_status: null,
+    boundary_evidence_version: 1,
+    sandbox_requested: "workspace-write",
+    sandbox_bootstrap_verified: true,
+    sandbox_failure_detected: false,
+    sandbox_failure_code: null,
+    execution_boundary_verified: status === "completed" || status === "blocked",
+    fallback_tool_violations: [],
+    execution_warnings: [],
     ...overrides
   };
 }

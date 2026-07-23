@@ -54,6 +54,136 @@ describe("codex-task-runner", () => {
     expect(result.result_bytes).toBe(resultBuffer.length);
   });
 
+  test("exit zero plus completed RESULT and a correct diff still fails after a structured sandbox bootstrap error", async () => {
+    const fixture = await createFixture();
+    const result = await run(fixture, {
+      emitBoundaryEvent: false,
+      behavior: async ({ stdout }) => {
+        stdout.write(`${JSON.stringify({
+          type: "error",
+          error: { code: "orchestrator_helper_launch_failed", message: "helper launch failed" }
+        })}\n`);
+        stdout.write(`${JSON.stringify({
+          type: "item.completed",
+          item: { type: "command_execution", command: "normal in-scope patch", status: "completed", exit_code: 0 }
+        })}\n`);
+        await writeFile(join(fixture.root, "src", "app.ts"), "export const app = 'correct diff';\n");
+        await writeResult(fixture, "completed");
+        return 0;
+      }
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      exit_code: 0,
+      result_status: "completed",
+      changed_paths: ["src/app.ts"],
+      error_code: "CODEX_SANDBOX_BOOTSTRAP_FAILED",
+      sandbox_failure_detected: true,
+      sandbox_failure_code: "orchestrator_helper_launch_failed",
+      execution_boundary_verified: false
+    });
+  });
+
+  test("stderr-only setup refresh failure is terminal before normal success", async () => {
+    const fixture = await createFixture();
+    const result = await run(fixture, {
+      behavior: async ({ stderr }) => {
+        stderr.write("setup refresh failed: failed to spawn codex-windows-sandbox-setup.exe\n");
+        await writeResult(fixture, "completed");
+        return 0;
+      }
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      error_code: "CODEX_SANDBOX_BOOTSTRAP_FAILED",
+      sandbox_failure_detected: true,
+      execution_boundary_verified: false
+    });
+  });
+
+  test("Node REPL file writes are terminal control-boundary violations", async () => {
+    const fixture = await createFixture();
+    const result = await run(fixture, {
+      emitBoundaryEvent: false,
+      behavior: async ({ stdout }) => {
+        stdout.write(`${JSON.stringify({
+          type: "item.completed",
+          item: {
+            type: "mcp_tool_call",
+            server: "node_repl",
+            tool: "run",
+            status: "completed",
+            arguments: { code: "require('fs').writeFileSync('src/app.ts', 'raw host write')" }
+          }
+        })}\n`);
+        await writeFile(join(fixture.root, "src", "app.ts"), "raw host write\n");
+        await writeResult(fixture, "completed");
+        return 0;
+      }
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      error_code: "CODEX_EXECUTION_BOUNDARY_UNVERIFIED",
+      execution_boundary_verified: false,
+      fallback_tool_violations: expect.arrayContaining([
+        "node_repl/run:host_file_or_git_operation",
+        "node_repl/run:unverified_external_write_path"
+      ])
+    });
+  });
+
+  test("Node REPL Git commands violate the boundary even without a file diff", async () => {
+    const fixture = await createFixture();
+    const result = await run(fixture, {
+      emitBoundaryEvent: false,
+      behavior: async ({ stdout }) => {
+        stdout.write(`${JSON.stringify({
+          type: "item.completed",
+          item: {
+            type: "mcp_tool_call",
+            server: "node_repl",
+            tool: "run",
+            status: "completed",
+            arguments: { code: "require('child_process').execFileSync('git', ['status'])" }
+          }
+        })}\n`);
+        await writeResult(fixture, "completed");
+        return 0;
+      }
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      error_code: "CODEX_EXECUTION_BOUNDARY_UNVERIFIED",
+      fallback_tool_violations: expect.arrayContaining([
+        "node_repl/run:host_file_or_git_operation",
+        "node_repl/run:unverified_external_tool_path"
+      ])
+    });
+  });
+
+  test("unknown write provenance fails closed", async () => {
+    const fixture = await createFixture();
+    const result = await run(fixture, {
+      emitBoundaryEvent: false,
+      behavior: async ({ stdout }) => {
+        stdout.write(`${JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: "done" } })}\n`);
+        await writeFile(join(fixture.root, "src", "app.ts"), "export const app = 'unknown provenance';\n");
+        await writeResult(fixture, "completed");
+        return 0;
+      }
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      error_code: "CODEX_EXECUTION_BOUNDARY_UNVERIFIED",
+      fallback_tool_violations: ["unknown_write_provenance"]
+    });
+  });
+
   test("accepts a blocked RESULT as a terminal success when contracts remain intact", async () => {
     const fixture = await createFixture();
     const result = await run(fixture, {
@@ -372,7 +502,15 @@ function startingState(head) {
     forbidden_path_changes: [],
     result_sha256: null,
     result_bytes: null,
-    result_status: null
+    result_status: null,
+    boundary_evidence_version: 1,
+    sandbox_requested: "workspace-write",
+    sandbox_bootstrap_verified: true,
+    sandbox_failure_detected: false,
+    sandbox_failure_code: null,
+    execution_boundary_verified: false,
+    fallback_tool_violations: [],
+    execution_warnings: []
   };
 }
 
@@ -398,6 +536,12 @@ async function run(fixture, options) {
       capture.options = spawnOptions;
       const child = fakeChild(async (streams) => {
         capture.stdin = streams.stdinText;
+        if (options.emitBoundaryEvent !== false) {
+          streams.stdout.write(`${JSON.stringify({
+            type: "item.completed",
+            item: { type: "command_execution", command: "bounded test operation", status: "completed", exit_code: 0 }
+          })}\n`);
+        }
         return options.behavior(streams);
       });
       capture.child = child;

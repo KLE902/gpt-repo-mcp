@@ -13,7 +13,7 @@ import {
   type CodexStartResult,
   type CodexTaskManifest
 } from "../contracts/codex-task.contract.js";
-import { RepoReaderError } from "../runtime/errors.js";
+import { RepoReaderError, type RepoReaderErrorCode } from "../runtime/errors.js";
 import { GitService } from "./git-service.js";
 import { OperationsPolicy } from "./operations-policy.js";
 import { PathSandbox } from "./path-sandbox.js";
@@ -23,7 +23,13 @@ const STARTUP_WAIT_MS = 15_000;
 const POLL_MS = 50;
 const BASE_BRANCHES = new Set(["main", "master"]);
 
-type CliVerification = { command: string; version: string; cd_flag: "--cd" | "-C" };
+type CliVerification = {
+  command: string;
+  version: string;
+  cd_flag: "--cd" | "-C";
+  sandbox_bootstrap_verified: true;
+  sandboxed_operation_verified: true;
+};
 type RunnerLaunch = { pid: number };
 type StartDependencies = {
   verifyCli?: (root: string) => Promise<CliVerification>;
@@ -85,6 +91,8 @@ export class CodexExecutionService {
     await assertArtifactsIgnored(this.root, [paths.executionPath, paths.stdoutPath, paths.stderrPath, paths.lockPath]);
 
     const cli = await this.verifyCli(this.root);
+    const gitAfterProbe = await this.git.status();
+    assertGitStartState(gitAfterProbe, input.expected_branch, input.expected_head_sha);
     const lockInspection = await inspectLock(this.root, paths.lockPath, this.processAlive);
     if (lockInspection.active) {
       throw new RepoReaderError("CODEX_RUN_ACTIVE", `Another active Codex run already owns this repository (${lockInspection.runId}).`);
@@ -96,7 +104,9 @@ export class CodexExecutionService {
       cwd_verified: true,
       prompt_via_stdin: true,
       structured_output: true,
-      sandbox: "workspace-write" as const
+      sandbox: "workspace-write" as const,
+      sandbox_bootstrap_verified: cli.sandbox_bootstrap_verified,
+      sandboxed_operation_verified: cli.sandboxed_operation_verified
     };
     const warnings = lockInspection.stale ? ["STALE_CODEX_LOCK_VERIFIED"] : [];
 
@@ -118,7 +128,7 @@ export class CodexExecutionService {
     }
 
     await acquireLock(this.root, paths.lockPath, input.repo_id, input.run_id, process.pid, this.now(), this.processAlive);
-    const starting = createStartingState(input, paths, policy, this.now);
+    const starting = createStartingState(input, paths, policy, cli, this.now);
     await writeExecutionStateAtomic(this.root, starting, true);
 
     let runner: RunnerLaunch;
@@ -268,7 +278,13 @@ async function replaceFileSafely(temporary: string, target: string): Promise<voi
   }
 }
 
-function createStartingState(input: CodexStartInput, paths: ReturnType<typeof codexRunPaths>, policy: { timeout_ms: number; max_output_bytes: number }, now: () => Date): CodexExecutionState {
+function createStartingState(
+  input: CodexStartInput,
+  paths: ReturnType<typeof codexRunPaths>,
+  policy: { timeout_ms: number; max_output_bytes: number },
+  cli: CliVerification,
+  now: () => Date
+): CodexExecutionState {
   const timestamp = now().toISOString();
   return {
     schema_version: 1,
@@ -307,7 +323,15 @@ function createStartingState(input: CodexStartInput, paths: ReturnType<typeof co
     forbidden_path_changes: [],
     result_sha256: null,
     result_bytes: null,
-    result_status: null
+    result_status: null,
+    boundary_evidence_version: 1,
+    sandbox_requested: "workspace-write",
+    sandbox_bootstrap_verified: cli.sandbox_bootstrap_verified,
+    sandbox_failure_detected: false,
+    sandbox_failure_code: null,
+    execution_boundary_verified: false,
+    fallback_tool_violations: [],
+    execution_warnings: []
   };
 }
 
@@ -451,6 +475,12 @@ async function verifyCodexCliCapabilities(root: string): Promise<CliVerification
     executeCommand: (command: string, args: string[], options: Record<string, unknown>) => Promise<{ exitCode: number | null; timedOut: boolean; truncated: boolean; complete: boolean; stdout: string; stderr: string }>;
     buildAgentEnvironment: (provider: string, env: NodeJS.ProcessEnv, platform: string) => NodeJS.ProcessEnv;
     detectCapabilities: (provider: string, help: string) => { exec: boolean; json: boolean; sandbox: boolean; cd: boolean; cd_flag: "--cd" | "-C" | null };
+    buildProbeInvocation: (provider: string, capabilities: Record<string, unknown>, cwd: string) => { args: string[]; redactedArgs: string[] };
+    validateProbeOutput: (provider: string, stdout: string, marker?: string) => void;
+    runCodexSandboxVerification: (options: Record<string, unknown>) => Promise<{
+      sandbox_bootstrap_verified: true;
+      sandboxed_operation_verified: true;
+    }>;
   };
   const env = foundation.buildAgentEnvironment("codex", process.env, process.platform);
   const cli = await foundation.resolveCliCommand("codex", foundation.executeCommand, process.platform);
@@ -464,7 +494,61 @@ async function verifyCodexCliCapabilities(root: string): Promise<CliVerification
   if (!capabilities.exec || !capabilities.json || !capabilities.sandbox || !capabilities.cd || !capabilities.cd_flag) {
     throw new RepoReaderError("CODEX_CLI_CAPABILITY_MISSING", "Codex CLI is missing required non-interactive JSONL, sandbox, or repository-root capabilities.");
   }
-  return { command: cli, version: version.stdout.trim().split(/\r?\n/, 1)[0] ?? "unknown", cd_flag: capabilities.cd_flag };
+
+  const authenticationMarker = "MCP_AGENT_CLI_CODEX_PROBE_OK";
+  const authenticationInvocation = foundation.buildProbeInvocation("codex", capabilities, root);
+  const authentication = await foundation.executeCommand(cli, authenticationInvocation.args, {
+    cwd: root,
+    input: `Do not modify files and do not run shell commands. Return the exact marker ${authenticationMarker} and nothing else.`,
+    env,
+    timeoutMs: 180_000,
+    maxOutputBytes: 1_048_576
+  });
+  if (authentication.exitCode !== 0 || authentication.timedOut || authentication.truncated || !authentication.complete) {
+    throw new RepoReaderError("CODEX_AUTHENTICATION_PROBE_FAILED", "Codex non-interactive authentication verification failed.");
+  }
+  try {
+    foundation.validateProbeOutput("codex", authentication.stdout, authenticationMarker);
+  } catch {
+    throw new RepoReaderError("CODEX_AUTHENTICATION_PROBE_FAILED", "Codex authentication verification returned invalid structured output.");
+  }
+
+  let sandboxVerification;
+  try {
+    sandboxVerification = await foundation.runCodexSandboxVerification({
+      cliPath: cli,
+      cwd: root,
+      capabilities,
+      env,
+      runCommand: foundation.executeCommand,
+      timeoutMs: 180_000,
+      maxOutputBytes: 1_048_576
+    });
+  } catch (error) {
+    const code = codexProbeErrorCode(error);
+    throw new RepoReaderError(code, error instanceof Error ? error.message : "Codex workspace-write sandbox verification failed.");
+  }
+
+  return {
+    command: cli,
+    version: version.stdout.trim().split(/\r?\n/, 1)[0] ?? "unknown",
+    cd_flag: capabilities.cd_flag,
+    sandbox_bootstrap_verified: sandboxVerification.sandbox_bootstrap_verified,
+    sandboxed_operation_verified: sandboxVerification.sandboxed_operation_verified
+  };
+}
+
+function codexProbeErrorCode(error: unknown): RepoReaderErrorCode {
+  const raw = typeof (error as { code?: unknown })?.code === "string" ? String((error as { code?: unknown }).code) : "";
+  const allowed = new Set<RepoReaderErrorCode>([
+    "CODEX_SANDBOX_BOOTSTRAP_FAILED",
+    "CODEX_SANDBOX_PROBE_TIMED_OUT",
+    "CODEX_SANDBOX_PROBE_OUTPUT_INCOMPLETE",
+    "CODEX_SANDBOX_PROBE_FAILED",
+    "CODEX_SANDBOX_OPERATION_NOT_VERIFIED",
+    "CODEX_EXECUTION_BOUNDARY_UNVERIFIED"
+  ]);
+  return allowed.has(raw as RepoReaderErrorCode) ? raw as RepoReaderErrorCode : "CODEX_SANDBOX_BOOTSTRAP_FAILED";
 }
 
 async function launchDetachedRunner(options: RunnerLaunchOptions): Promise<RunnerLaunch> {

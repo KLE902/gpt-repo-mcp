@@ -1684,6 +1684,7 @@ describe("tool catalog contracts", () => {
           "name": "repo_codex_review",
           "outputKeys": [
             "codex_result",
+            "execution_boundary",
             "execution_found",
             "execution_state",
             "git_review",

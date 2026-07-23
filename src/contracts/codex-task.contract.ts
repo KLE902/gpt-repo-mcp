@@ -73,7 +73,15 @@ export const CodexExecutionStateSchema = z.object({
   forbidden_path_changes: z.array(z.string()),
   result_sha256: Sha256Schema.nullable(),
   result_bytes: z.number().int().nonnegative().nullable(),
-  result_status: z.enum(["completed", "blocked"]).nullable()
+  result_status: z.enum(["completed", "blocked"]).nullable(),
+  boundary_evidence_version: z.literal(1).nullable().default(null),
+  sandbox_requested: z.literal("workspace-write").nullable().default(null),
+  sandbox_bootstrap_verified: z.boolean().default(false),
+  sandbox_failure_detected: z.boolean().default(false),
+  sandbox_failure_code: z.string().nullable().default(null),
+  execution_boundary_verified: z.boolean().default(false),
+  fallback_tool_violations: z.array(z.string()).default([]),
+  execution_warnings: z.array(z.string()).default([])
 }).strict();
 
 export const CodexExecutionReviewStateSchema = CodexExecutionStateSchema.extend({
@@ -144,7 +152,9 @@ export const CodexStartResultSchema = z.object({
     cwd_verified: z.boolean(),
     prompt_via_stdin: z.boolean(),
     structured_output: z.boolean(),
-    sandbox: z.literal("workspace-write")
+    sandbox: z.literal("workspace-write"),
+    sandbox_bootstrap_verified: z.boolean(),
+    sandboxed_operation_verified: z.boolean()
   }),
   next_steps: z.array(z.string()),
   warnings: z.array(z.string())
@@ -167,6 +177,16 @@ export const CodexParsedResultSchema = z.object({
   raw_text: z.string()
 });
 
+export const CodexExecutionBoundaryReviewSchema = z.object({
+  requested_sandbox: z.literal("workspace-write").nullable(),
+  sandbox_bootstrap_verified: z.boolean(),
+  sandbox_failure_detected: z.boolean(),
+  sandbox_failure_code: z.string().nullable(),
+  execution_boundary_verified: z.boolean(),
+  fallback_tool_violations: z.array(z.string()),
+  classification_reason: z.string()
+});
+
 export const CodexReviewResultSchema = z.object({
   ok: z.literal(true),
   repo_id: z.string(),
@@ -174,6 +194,7 @@ export const CodexReviewResultSchema = z.object({
   result_path: z.string(),
   execution_found: z.boolean().optional(),
   execution_state: CodexExecutionReviewStateSchema.optional(),
+  execution_boundary: CodexExecutionBoundaryReviewSchema.optional(),
   result_found: z.boolean(),
   codex_result: CodexParsedResultSchema.optional(),
   git_review: GitReviewResultSchema.optional(),

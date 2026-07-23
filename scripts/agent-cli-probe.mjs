@@ -1,7 +1,9 @@
 import { execFile, spawn } from "node:child_process";
 import { Buffer } from "node:buffer";
 import { existsSync } from "node:fs";
-import { basename, resolve, win32 } from "node:path";
+import { readFile, rm, rmdir } from "node:fs/promises";
+import { basename, dirname, join, resolve, win32 } from "node:path";
+import { analyzeCodexJsonl } from "./codex-execution-boundary.mjs";
 import { pathToFileURL } from "node:url";
 
 const SHA_PATTERN = /^[a-f0-9]{40}$/i;
@@ -36,6 +38,7 @@ export async function probeAgentCli(options = {}) {
   let capabilities;
   let invocation;
   let probeResult;
+  let sandboxVerification;
   let failure;
 
   try {
@@ -78,22 +81,37 @@ export async function probeAgentCli(options = {}) {
       timeoutMs,
       maxOutputBytes
     });
-    assertCommandSucceeded(probeResult, "CLI_PROBE_FAILED", `${provider} non-interactive probe failed.`);
+    assertCommandSucceeded(probeResult, "CLI_PROBE_FAILED", `${provider} non-interactive authentication probe failed.`);
     validateProbeOutput(provider, probeResult.stdout, marker);
-    if (provider === "claude") capabilities.max_turns = true;
+    if (provider === "claude") {
+      capabilities.max_turns = true;
+    } else {
+      sandboxVerification = await runCodexSandboxVerification({
+        cliPath,
+        cwd,
+        capabilities,
+        env: commandEnv,
+        runCommand,
+        timeoutMs,
+        maxOutputBytes,
+        probeId: options.probeId,
+        readProbeFile: options.readProbeFile,
+        cleanupProbe: options.cleanupProbe
+      });
+    }
   } catch (error) {
     failure = error;
   }
 
   const after = await readGitState(cwd, runCommand);
   if (after.head !== before.head) {
-    throw operationError("PROBE_HEAD_CHANGED", "Repository HEAD changed during the read-only capability probe.", {
+    throw operationError("PROBE_HEAD_CHANGED", "Repository HEAD changed during the capability and sandbox probe.", {
       before_head: before.head,
       after_head: after.head
     });
   }
   if (!after.clean) {
-    throw operationError("PROBE_WORKTREE_CHANGED", "The read-only capability probe changed the worktree.", {
+    throw operationError("PROBE_WORKTREE_CHANGED", "The capability or sandbox probe changed the repository worktree or index.", {
       changed_paths: after.status.split(/\r?\n/).filter(Boolean).slice(0, 20)
     });
   }
@@ -106,6 +124,12 @@ export async function probeAgentCli(options = {}) {
     cli: basename(cliPath),
     version: firstLine(versionResult.stdout),
     authentication: "verified_by_non_interactive_probe",
+    verification: {
+      cli_capability: true,
+      authentication: true,
+      sandbox_bootstrap: provider === "codex" ? sandboxVerification.sandbox_bootstrap_verified : null,
+      sandboxed_operation_verified: provider === "codex" ? sandboxVerification.sandboxed_operation_verified : null
+    },
     capabilities,
     invocation: {
       command: basename(cliPath),
@@ -114,6 +138,7 @@ export async function probeAgentCli(options = {}) {
       read_only: true,
       structured_output: true
     },
+    ...(sandboxVerification ? { sandbox_invocation: sandboxVerification.invocation } : {}),
     git: {
       head_sha: before.head,
       clean_before: before.clean,
@@ -124,7 +149,7 @@ export async function probeAgentCli(options = {}) {
       truncated: probeResult.truncated,
       marker_verified: true
     },
-    warnings: []
+    warnings: sandboxVerification?.warnings ?? []
   };
 }
 
@@ -183,6 +208,82 @@ export function buildProbeInvocation(provider, capabilities, cwd) {
   }
 
   throw operationError("PROVIDER_NOT_SUPPORTED", `Unsupported provider: ${provider}`);
+}
+
+export async function runCodexSandboxVerification(options) {
+  const marker = "MCP_AGENT_CLI_CODEX_SANDBOX_OK";
+  const fileMarker = "MCP_AGENT_CLI_CODEX_SANDBOX_FILE_OK";
+  const probeId = normalizeProbeId(options.probeId ?? `${Date.now()}-${globalThis.process.pid}`);
+  const probeRelativePath = `.chatgpt/sandbox-probes/${probeId}/sandbox-write.txt`;
+  const probeAbsolutePath = join(options.cwd, ...probeRelativePath.split("/"));
+  const probeDirectory = dirname(probeAbsolutePath);
+  const probeRoot = dirname(probeDirectory);
+  const cleanupProbe = options.cleanupProbe ?? (async () => cleanupProbeArtifacts(probeDirectory, probeRoot));
+  const readProbeFile = options.readProbeFile ?? (async () => readFile(probeAbsolutePath, "utf8"));
+  const args = ["exec", "--json", "--sandbox", "workspace-write", options.capabilities.cd_flag ?? "--cd", options.cwd, "-"];
+  const prompt = [
+    "Use only Codex's built-in sandboxed command or file-change tool.",
+    "Do not use MCP tools, Node REPL, JavaScript REPL, or any external host tool.",
+    `Create the repository-relative UTF-8 file ${probeRelativePath} with the exact content ${fileMarker}.`,
+    `After the file is created, return the exact marker ${marker} and nothing else.`
+  ].join(" ");
+
+  await cleanupProbe();
+  let result;
+  try {
+    result = await options.runCommand(options.cliPath, args, {
+      cwd: options.cwd,
+      input: prompt,
+      env: options.env,
+      timeoutMs: options.timeoutMs,
+      maxOutputBytes: options.maxOutputBytes
+    });
+    if (result?.timedOut) throw operationError("CODEX_SANDBOX_PROBE_TIMED_OUT", "Codex workspace-write sandbox verification timed out.");
+    if (result?.truncated || result?.complete === false) throw operationError("CODEX_SANDBOX_PROBE_OUTPUT_INCOMPLETE", "Codex workspace-write sandbox verification returned incomplete output.");
+
+    const tracker = analyzeCodexJsonl(result?.stdout, {
+      sandboxRequested: "workspace-write",
+      sandboxBootstrapVerified: false
+    });
+    tracker.observeStderr(result?.stderr);
+    const boundary = tracker.finalize({ changedPaths: [probeRelativePath] });
+    if (boundary.sandbox_failure_detected) {
+      throw operationError("CODEX_SANDBOX_BOOTSTRAP_FAILED", "Codex could not establish the requested workspace-write sandbox.", {
+        sandbox_failure_code: boundary.sandbox_failure_code
+      });
+    }
+    if (result?.exitCode !== 0) {
+      throw operationError("CODEX_SANDBOX_PROBE_FAILED", "Codex workspace-write sandbox verification exited unsuccessfully.", {
+        exit_code: result?.exitCode ?? null,
+        stderr: sanitizeDiagnosticText(result?.stderr)
+      });
+    }
+    validateProbeOutput("codex", result.stdout, marker);
+    const fileContent = String(await readProbeFile());
+    if (![fileMarker, `${fileMarker}\n`, `${fileMarker}\r\n`].includes(fileContent)) {
+      throw operationError("CODEX_SANDBOX_OPERATION_NOT_VERIFIED", "The workspace-write sandbox probe did not create the exact expected artifact.");
+    }
+    if (!boundary.sandboxed_operation_observed || boundary.fallback_tool_violations.length > 0) {
+      throw operationError("CODEX_EXECUTION_BOUNDARY_UNVERIFIED", "The workspace-write probe lacked positive built-in sandbox provenance or used an unverified fallback path.", {
+        fallback_tool_violations: boundary.fallback_tool_violations
+      });
+    }
+
+    return {
+      sandbox_bootstrap_verified: true,
+      sandboxed_operation_verified: true,
+      invocation: {
+        command: basename(options.cliPath),
+        args: args.map((value) => value === options.cwd ? "<repo-root>" : value),
+        cwd_verified: true,
+        structured_output: true,
+        sandbox: "workspace-write"
+      },
+      warnings: boundary.warnings
+    };
+  } finally {
+    await cleanupProbe();
+  }
 }
 
 export function validateProbeOutput(provider, stdout, marker = MARKERS[provider]) {
@@ -591,6 +692,21 @@ export function terminateProcessTree(child) {
     execFile("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true }, () => {});
   }
   child.kill("SIGKILL");
+}
+
+async function cleanupProbeArtifacts(probeDirectory, probeRoot) {
+  await rm(probeDirectory, { recursive: true, force: true });
+  try {
+    await rmdir(probeRoot);
+  } catch (error) {
+    if (!["ENOENT", "ENOTEMPTY", "EEXIST"].includes(error?.code)) throw error;
+  }
+}
+
+function normalizeProbeId(value) {
+  const normalized = String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+  if (!normalized) throw operationError("CODEX_SANDBOX_PROBE_INVALID", "The sandbox probe id is invalid.");
+  return normalized;
 }
 
 function normalizeProvider(value) {
