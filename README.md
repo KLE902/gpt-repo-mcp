@@ -265,6 +265,7 @@ New to ngrok? See [Install ngrok from zero](docs/SETUP.md#install-ngrok-from-zer
 
 ## Documentation
 
+- [Agent task orchestration foundation](docs/agent-task-orchestration/README.md)
 - [Setup](docs/SETUP.md)
 - [ChatGPT connector steps](docs/CHATGPT_CONNECT.md)
 - [Connection options](docs/CONNECTION_OPTIONS.md)
