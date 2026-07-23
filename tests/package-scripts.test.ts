@@ -106,6 +106,8 @@ describe("package startup scripts", () => {
 
     const powershellLauncher = await readFile(powershellLauncherPath, "utf8");
     expect(powershellLauncher).toContain("ClaudePath");
+    expect(powershellLauncher).toContain("Start-Process");
+    expect(powershellLauncher).toContain("-WindowStyle Normal");
     expect(powershellLauncher).toContain("auth login");
     expect(powershellLauncher).toContain("auth status --text");
     expect(powershellLauncher).not.toContain("npm root");
@@ -114,9 +116,10 @@ describe("package startup scripts", () => {
 
     const nodeLauncher = await readFile(nodeLauncherPath, "utf8");
     expect(nodeLauncher).toContain("resolveGlobalNpmClaudeEntry");
-    expect(nodeLauncher).toContain("detached: true");
-    expect(nodeLauncher).toContain("windowsHide: false");
-    expect(nodeLauncher).toContain("CLAUDE_AUTH_LOGIN_STARTED");
+    expect(nodeLauncher).toContain("knownWindowsCliCandidates");
+    expect(nodeLauncher).not.toContain("detached: true");
+    expect(nodeLauncher).not.toContain("windowsHide: false");
+    expect(nodeLauncher).not.toContain("CLAUDE_AUTH_LOGIN_STARTED");
     expect(nodeLauncher).not.toContain("CLAUDE_CODE_OAUTH_TOKEN");
     expect(nodeLauncher).not.toContain("ANTHROPIC_API_KEY");
     await expect(run(process.execPath, ["--check", nodeLauncherPath], process.cwd())).resolves.toBeDefined();

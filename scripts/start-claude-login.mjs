@@ -1,10 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import {
-  buildClaudeEnvironment,
   knownWindowsCliCandidates,
   resolveGlobalNpmClaudeEntry,
   selectCliCandidate
@@ -95,28 +92,9 @@ async function resolveClaudeBinary() {
 
 async function main() {
   if (globalThis.process.platform !== "win32") {
-    throw new Error("The visible Claude Code login launcher currently supports Windows only.");
+    throw new Error("The Claude Code login launcher currently supports Windows only.");
   }
-
-  const claudePath = await resolveClaudeBinary();
-  const environment = buildClaudeEnvironment();
-  const scriptPath = resolve(dirname(fileURLToPath(import.meta.url)), "start-claude-login.ps1");
-  const child = spawn("powershell.exe", [
-    "-NoProfile",
-    "-ExecutionPolicy", "Bypass",
-    "-File", scriptPath,
-    "-InteractiveChild",
-    "-ClaudePath", claudePath
-  ], {
-    cwd: globalThis.process.env.USERPROFILE || globalThis.process.cwd(),
-    env: environment,
-    detached: true,
-    shell: false,
-    stdio: "ignore",
-    windowsHide: false
-  });
-  child.unref();
-  globalThis.console.log("CLAUDE_AUTH_LOGIN_STARTED");
+  globalThis.console.log(await resolveClaudeBinary());
 }
 
 main().catch((error) => {

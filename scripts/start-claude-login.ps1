@@ -63,5 +63,24 @@ $Launcher = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "start-c
 if (-not (Test-Path -LiteralPath $Launcher -PathType Leaf)) {
     throw "The Claude Code login launcher could not be resolved."
 }
-& $Node $Launcher
-exit $LASTEXITCODE
+
+$ResolvedClaude = (& $Node $Launcher | Select-Object -Last 1)
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($ResolvedClaude)) {
+    throw "The verified Claude Code binary could not be resolved."
+}
+$ResolvedClaude = $ResolvedClaude.Trim()
+if (-not (Test-Path -LiteralPath $ResolvedClaude -PathType Leaf)) {
+    throw "The resolved Claude Code binary does not exist."
+}
+
+$ScriptPath = $MyInvocation.MyCommand.Path
+$ChildArguments = @(
+    "-NoProfile",
+    "-ExecutionPolicy", "Bypass",
+    "-File", ('"{0}"' -f $ScriptPath),
+    "-InteractiveChild",
+    "-ClaudePath", ('"{0}"' -f $ResolvedClaude)
+)
+Start-Process -FilePath "powershell.exe" -ArgumentList $ChildArguments -WindowStyle Normal
+Write-Output "CLAUDE_AUTH_LOGIN_STARTED"
+exit 0
