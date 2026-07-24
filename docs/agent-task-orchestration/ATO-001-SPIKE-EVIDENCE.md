@@ -30,7 +30,7 @@ The candidate task bytes were verified as UTF-8 with no prefix, suffix, normaliz
 
 The spike branch initially implemented fixed start and review operations, a fixed Claude invocation, an MCP-owned artifact set, semantic result parsing, and a live-worktree read lease. Those mechanisms were implementation candidates, not validated production capability.
 
-The final PR tree intentionally removes that runtime implementation, its MCP surface, compatibility operation, policy toggle, fixed task file, and spike-only tests. The implementation history remains available in the branch commits and in this evidence record. No active or latent ATO-001 Claude runner is delivered by PR #23.
+The final PR tree removes all executable runtime content and disconnects the MCP surface, compatibility operation, policy toggle, fixed task content, parser, lease, and active spike tests. The bounded repository writer used for this correction cannot delete tracked paths: ten branch-created runtime paths therefore remain as zero-byte inert files, and two branch-created test paths contain only skipped retirement markers. The implementation history remains available in the branch commits and in this evidence record. No active or latent ATO-001 Claude runner is delivered by PR #23.
 
 ## Implementation and component activity
 
