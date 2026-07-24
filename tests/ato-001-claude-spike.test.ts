@@ -139,6 +139,7 @@ describe("ATO-001 fixed Claude spike", () => {
     }).review({
       call_id: "00000000-0000-4000-8000-000000000001",
       recorded_at: "2026-07-24T10:01:00.000Z"
+      ,tool: "repo_ato_001_claude_review"
     });
 
     expect(result).toMatchObject({

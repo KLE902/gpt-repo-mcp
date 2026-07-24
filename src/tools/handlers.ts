@@ -474,7 +474,7 @@ export const codexReviewHandler: ToolHandler = async (input, context) => safeToo
 export const startAto001ClaudeHandler: ToolHandler = async (input, context) => safeTool<Record<string, never>>("repo_start_ato_001_claude", input, context, async () => {
   const repo = context.registry.get(ATO001_REPO_ID);
   new OperationsPolicy(repo.operations).assertAto001ClaudeAllowed();
-  const result = await new Ato001ClaudeStartService(repo.root, process.cwd()).start({ call_id: randomUUID(), recorded_at: new Date().toISOString() });
+  const result = await new Ato001ClaudeStartService(repo.root, process.cwd()).start({ call_id: randomUUID(), recorded_at: new Date().toISOString(), tool: "repo_start_ato_001_claude" });
   audit({
     tool: "repo_start_ato_001_claude",
     repo_id: ATO001_REPO_ID,
@@ -491,7 +491,7 @@ export const startAto001ClaudeHandler: ToolHandler = async (input, context) => s
 export const ato001ClaudeReviewHandler: ToolHandler = async (input, context) => safeTool<Record<string, never>>("repo_ato_001_claude_review", input, context, async () => {
   const repo = context.registry.get(ATO001_REPO_ID);
   new OperationsPolicy(repo.operations).assertAto001ClaudeAllowed();
-  const result = await new Ato001ClaudeReviewService(repo.root).review({ call_id: randomUUID(), recorded_at: new Date().toISOString() });
+  const result = await new Ato001ClaudeReviewService(repo.root).review({ call_id: randomUUID(), recorded_at: new Date().toISOString(), tool: "repo_ato_001_claude_review" });
   audit({
     tool: "repo_ato_001_claude_review",
     repo_id: ATO001_REPO_ID,

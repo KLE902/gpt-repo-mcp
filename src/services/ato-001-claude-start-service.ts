@@ -63,7 +63,7 @@ export class Ato001ClaudeStartService {
     this.startupWaitMs = dependencies.startupWaitMs ?? 15_000;
   }
 
-  async start(call: { call_id: string; recorded_at: string }): Promise<Ato001ClaudeStartResult> {
+  async start(call: { call_id: string; recorded_at: string; tool: string }): Promise<Ato001ClaudeStartResult> {
     await this.assertArtifactsAbsent();
     const repository = await this.verifyRepository();
     const taskSource = resolve(this.projectRoot, ...ATO001_TASK_SOURCE_PATH.split("/"));
@@ -280,11 +280,11 @@ function initialState(now: Date): Ato001ExecutionState {
   };
 }
 
-function initialMeasurements(call: { call_id: string; recorded_at: string }) {
+function initialMeasurements(call: { call_id: string; recorded_at: string; tool: string }) {
   return {
     owner_prompt_relay_count: 0,
     owner_result_relay_count: 0,
-    chatgpt_mcp_start_calls: [{ ...call, tool: "repo_start_ato_001_claude" }],
+    chatgpt_mcp_start_calls: [call],
     chatgpt_mcp_review_calls: [],
     measured_start_via_chatgpt_mcp: true,
     measured_result_retrieval_via_chatgpt_mcp: false,

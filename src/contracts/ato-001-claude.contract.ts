@@ -4,7 +4,7 @@ const Sha256Schema = z.string().regex(/^[0-9a-f]{64}$/);
 const IsoDateSchema = z.string().datetime({ offset: true });
 const Ato001McpCallSchema = z.object({
   call_id: z.string().uuid(),
-  tool: z.enum(["repo_start_ato_001_claude", "repo_ato_001_claude_review"]),
+  tool: z.string().min(1).max(128),
   recorded_at: IsoDateSchema
 }).strict();
 

@@ -35,6 +35,8 @@ The temporary spike adds exactly two fixed MCP operations:
 
 The caller cannot provide prompt text, executable, command, arguments, model, provider flags, tools, environment, working directory, timeout, cost, budget, repository, branch, HEAD, context paths, or hashes.
 
+The dedicated tools are the primary interface. Because the live ChatGPT connector catalog for this already-open conversation cannot hot-refresh after a server build, the measured run may use two fixed allowlisted MCP compatibility operations through the already-exposed `repo_run_allowed_script` tool: `mcp.ato001.start` and `mcp.ato001.review`. Those operations invoke the same start/review services with no caller-controlled runtime input and record their actual MCP operation identities. They do not call Claude directly or read result artifacts outside the MCP lifecycle.
+
 The fixed Claude invocation is one-turn, non-interactive, structured, read-only, and restricted to `Read`, `Glob`, and `Grep`. `Bash`, `Edit`, `Write`, and `NotebookEdit` are explicitly disallowed. Runtime and complete output are bounded. Timeout or truncation is terminal and cannot be treated as a valid result. The exact current CLI version is verified at start and must remain identical inside the detached runner.
 
 A persistent live-worktree read lease blocks all known MCP mutating operations against the pinned PKR repository until terminal review. It does not claim protection against unrelated external host processes; that remains a residual Phase 0.5 risk.

@@ -26,7 +26,7 @@ type ReviewDependencies = {
   now?: () => Date;
 };
 
-type ReviewCall = { call_id: string; recorded_at: string };
+type ReviewCall = { call_id: string; recorded_at: string; tool: string };
 type Measurements = ReturnType<typeof Ato001MeasurementsSchema.parse>;
 
 export class Ato001ClaudeReviewService {
@@ -165,7 +165,7 @@ export class Ato001ClaudeReviewService {
       ...current,
       chatgpt_mcp_review_calls: [
         ...current.chatgpt_mcp_review_calls,
-        { ...call, tool: "repo_ato_001_claude_review" }
+        call
       ],
       measured_result_retrieval_via_chatgpt_mcp: terminal || current.measured_result_retrieval_via_chatgpt_mcp
     });
