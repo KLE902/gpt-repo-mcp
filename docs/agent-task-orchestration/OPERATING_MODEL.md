@@ -1,4 +1,4 @@
-# Agent Task Orchestration Operating Model
+# Agent Task Orchestration (ATO) Operating Model
 
 Status: **proposed; owner ratification pending**.
 
@@ -13,7 +13,7 @@ The operating model removes manual transport while keeping decision authority, e
 ### Owner
 
 - sets product direction and material constraints;
-- decides when a decision warrants independent architecture positions;
+- decides when a decision warrants an Architecture Review (AR);
 - ratifies architecture decisions and merge actions;
 - may reject a converged recommendation;
 - remains the final authority when evidence is incomplete or trade-offs are value judgments.
@@ -64,9 +64,11 @@ Typical uses:
 - documentation tightening;
 - review of a concrete proposal.
 
-### Independent deliberation
+### Architecture Review (AR)
 
 Use when stakes and genuine uncertainty justify independent expert positions. Anchoring is undesirable.
+
+An AR is a bounded deliberation workflow, not a permanent committee. The owner is the decision authority; coordinator, independent positions, reviewers, and synthesizer are temporary roles selected for the specific review. No provider is permanently assigned to AR participation.
 
 Typical uses:
 
@@ -108,7 +110,25 @@ The critic should identify:
 
 The output is a usable task contract, not a transcript of debate.
 
-## 5. Independent architecture deliberation
+## 4.5. Interim PKR need intake before ATO automation
+
+ATO must not block PKR product intake while durable multi-provider transport is still unavailable.
+
+For a new PKR need:
+
+1. the owner states the need in ordinary language;
+2. ChatGPT inspects the current repository authorities and implementation evidence;
+3. ChatGPT proposes the intended outcome, scope, explicit exclusions, dependencies, acceptance outcome, verification needs, and any owner decisions;
+4. an AR is used only when the question has material consequence and genuine uncertainty;
+5. the owner approves the product need separately from the existing `Kör` execution trigger;
+6. only the existing PKR authority documents are updated: the backlog owns unresolved needs and eligibility, the design specification owns ratified product and architecture direction, and project state owns the active runway;
+7. an exact operational task contract is created only when the need becomes active.
+
+This interim flow creates no Requirement Card database, no new PKR numbering scheme, and no dependency on ATO delivery. Until ATO transport exists, an AR participant such as Claude may require manual owner relay. That manual relay is an acknowledged temporary limitation, not the target operating state.
+
+## 5. Architecture Review (AR)
+
+AR is used selectively for material product, architecture, security, or process decisions. Claude or Codex may staff an independent position when the provider has the required capability and evidence access; neither provider is mandatory or permanently assigned.
 
 ### Decision brief
 
@@ -271,9 +291,9 @@ When sources conflict, use this order unless the task defines a stricter rule:
 
 A provider may identify a problem in a higher-ranked source, but its statement does not replace verification.
 
-## 11. Deliberation trigger
+## 11. AR trigger
 
-Use independent deliberation only when both conditions are true:
+Use an AR only when both conditions are true:
 
 - the decision has material cost, risk, irreversibility, or architectural reach;
 - reasonable experts could disagree because evidence or trade-offs are genuinely uncertain.

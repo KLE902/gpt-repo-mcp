@@ -1,4 +1,4 @@
-# Agent Task Orchestration Delivery Plan
+# Agent Task Orchestration (ATO) Delivery Plan
 
 Status: **proposed; owner ratification pending**.
 
@@ -52,7 +52,13 @@ Implementation belongs in GPT Repo MCP. PKR supplies real decision and delivery 
 
 This is a decision batch, not a prolonged design programme. It ends when implementation constraints are clear enough for the bounded transport spike.
 
-## 3.5. Phase 0.5 — Bounded transport spike
+### Work-package naming
+
+`ATO-nnn` identifies a bounded capability work package within this project and remains separate from `PKR-nnn` product needs. A work package is the owner-ratified semantic delivery authority; a durable task package is an executable instance that binds to the exact work-package path, commit, and blob identity and adds the current operational envelope without changing the approved outcome, scope, exclusions, or acceptance criteria.
+
+The first expected work package is `ATO-001 — Bounded Claude transport spike`. A permanent work-package template or generalized requirement process is deferred until actual use shows which fields are necessary.
+
+## 3.5. Phase 0.5 — Bounded transport spike (expected ATO-001)
 
 ### Purpose
 
@@ -123,11 +129,11 @@ The run must demonstrate:
 
 If manual relay is still required, Phase 1 has failed regardless of code quality.
 
-## 5. Phase 2 — Independent architecture deliberation pilot
+## 5. Phase 2 — Architecture Review (AR) pilot
 
 ### Scope
 
-- select one material, genuinely uncertain PKR architecture decision;
+- select one material, genuinely uncertain PKR architecture decision as a bounded AR;
 - produce a decision brief and decision criteria;
 - require both providers to challenge the brief framing before answering;
 - run blind independent Claude and Codex positions;
@@ -269,6 +275,8 @@ Evidence must show that the missing store—not poor decomposition—is the bott
 
 The infrastructure work must not silently reorder PKR's backlog.
 
+Before ATO automation exists, PKR product needs continue through the existing backlog, design-specification, and project-state authorities. ATO does not require a new Requirement Card store and does not gate ordinary product intake or execution.
+
 ## 11. Risks and controls
 
 | Risk | Control |
@@ -291,11 +299,14 @@ After ratification:
 
 1. confirm [`BASELINE_EVIDENCE.md`](BASELINE_EVIDENCE.md) against the exact branch and host state;
 2. record the current manual transport frequency and effort estimate;
-3. implement and run the bounded Phase 0.5 transport spike;
-4. decide from measured value whether Phase 1 proceeds;
-5. if approved, inspect the current Codex task, execution, review, process, policy, and contract layers;
-6. define the smallest provider-neutral task and result wrapper needed for read-only runs;
-7. specify compatibility with current Codex tools and artifacts;
-8. verify the Claude CLI boundary on the installed version and Windows runtime;
-9. produce the final implementation plan for Phase 1;
-10. stop before broad provider routing, write support, deterministic claims, or multi-agent delivery machinery.
+3. draft the bounded `ATO-001 — Bounded Claude transport spike` work package manually;
+4. review ATO-001 through a bounded manual AR because it introduces a new provider transport and read boundary; manual owner relay is expected for this pre-ATO review;
+5. obtain owner ratification of ATO-001;
+6. implement and run the bounded Phase 0.5 transport spike;
+7. decide from measured value whether Phase 1 proceeds;
+8. if approved, inspect the current Codex task, execution, review, process, policy, and contract layers;
+9. define the smallest provider-neutral task and result wrapper needed for read-only runs;
+10. specify compatibility with current Codex tools and artifacts;
+11. verify the Claude CLI boundary on the installed version and Windows runtime;
+12. produce the final implementation plan for Phase 1;
+13. stop before broad provider routing, write support, deterministic claims, or multi-agent delivery machinery.

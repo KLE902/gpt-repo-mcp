@@ -1,4 +1,4 @@
-# Agent Task Orchestration Architecture
+# Agent Task Orchestration (ATO) Architecture
 
 Status: **proposed; owner ratification pending**.
 
@@ -106,6 +106,10 @@ Proposed repo-local layout:
 
 `TASK.md` is the human-readable contract. `run.json` is the immutable machine contract. `RESULT.json` is the validated structured result. `RESULT.md` is an optional human-readable rendering and must not outrank `RESULT.json`, execution evidence, or Git state.
 
+An `ATO-nnn` capability work package is distinct from this durable task package. The work package, when used, is the owner-ratified semantic authority for one bounded capability delivery. The durable task package binds to the exact work-package path, commit SHA, and blob identity and adds provider, repository, context, access, runtime, and result-envelope details. It must not semantically rewrite the approved outcome, scope, exclusions, or acceptance criteria.
+
+This reference should be added under a new schema version only when the generic lifecycle consumes a real work package. It is not retrofitted into the current Codex manifest merely to reserve fields.
+
 ## 6. Minimal versioned manifest seam
 
 The initial provider-neutral manifest should stay small:
@@ -118,7 +122,7 @@ The initial provider-neutral manifest should stay small:
   "provider": "claude",
   "task_kind": "architecture_position",
   "access_profile": "read_only",
-  "orchestration": "independent_deliberation",
+  "orchestration": "architecture_review",
   "title": "...",
   "objective": "...",
   "branch": "master",
@@ -246,7 +250,7 @@ Deferred. It requires a separate threat model and empirical verification of Wind
 
 ChatGPT creates, starts, reads, and synthesizes explicit tasks. MCP does not hide multiple providers behind one opaque multiagent call.
 
-For independent deliberation, ChatGPT creates two tasks with the same decision brief and context snapshot, starts them separately, reads both results, and produces a synthesis. A targeted rebuttal is a new visible task, not an invisible recursive loop.
+For an Architecture Review (AR), ChatGPT creates independent tasks with the same decision brief and context snapshot, starts them separately, reads the results, and produces a synthesis. A targeted rebuttal is a new visible task, not an invisible recursive loop. AR is a workflow with temporary roles, not a permanent model group.
 
 MCP owns durable facts:
 
@@ -279,7 +283,7 @@ The initial read-only lifecycle does not require a dependency graph. The provide
 These fields support future work without making the initial runner a scheduler:
 
 - `delivery_id` groups activities contributing to one deliverable;
-- `orchestration_id` groups tasks in one deliberation or coordinated workflow;
+- `orchestration_id` groups tasks in one AR or coordinated workflow;
 - `parent_run_id` records refinement or repair lineage;
 - `depends_on` represents explicit prerequisites;
 - `integration_of` identifies component runs combined by an integration task.

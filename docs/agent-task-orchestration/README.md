@@ -1,4 +1,4 @@
-# Agent Task Orchestration Foundation
+# Agent Task Orchestration (ATO) Foundation
 
 Status: **proposed; owner ratification pending**.
 
@@ -14,6 +14,14 @@ The long-term goal is not a generic multiagent platform. It is a small, durable 
 - later, multiple isolated implementation activities contributing to one delivery.
 
 The design is transport-first. It stabilizes how a verified task enters a provider and how a durable result returns. Rich claim, evidence, verdict, routing, and orchestration semantics are added only when real use justifies them.
+
+## Terminology
+
+- **Agent Task Orchestration (ATO)** is the capability project described by this document set. `ATO-nnn` identifiers are reserved for bounded ATO capability work packages and do not replace PKR product identifiers.
+- **Architecture Review (AR)** is a bounded, evidence-based deliberation for material product, architecture, security, or process decisions. It is a workflow, not a permanent board or fixed group of models. Roles are selected per review, and the owner ratifies the outcome.
+- `AR-nnn` may identify a durable Architecture Review when a separate review record is useful. Routine, reversible work does not require an AR.
+
+ATO builds the transport and durable task capability. AR uses that capability selectively for consequential decisions.
 
 ## Verified baseline
 
@@ -42,7 +50,7 @@ The proposed direction is:
 7. Let ChatGPT coordinate visible tasks and synthesize results. MCP owns transport, durable state, policy, and execution boundaries; it is not a hidden multiagent engine.
 8. Use one writer per worktree. Read-only tasks may run independently; concurrent writers require separate worktrees and later integration verification.
 9. Fail closed when repository or context identity changes during a read-only run. Prefer an immutable read snapshot pinned to an exact commit when the implementation can support it.
-10. End architecture work in a proposed decision record. The owner ratifies the decision before authoritative project documentation changes.
+10. End Architecture Review work in a proposed decision record. The owner ratifies the decision before authoritative project documentation changes.
 11. Fix only a small, versioned result wrapper initially. Let task-specific structured payloads evolve from real use.
 12. Prove direct Claude transport with a bounded spike before committing to the full provider-neutral lifecycle refactor.
 13. Add deterministic claim verification only when observed false-completion risk, delivery scale, or multi-agent integration makes it worthwhile.
@@ -68,7 +76,7 @@ The PKR repository remains the consumer and dogfooding environment. GPT Repo MCP
 ## Document map
 
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — target boundaries, task lifecycle, manifests, adapters, context snapshots, security invariants, and future multi-agent extension points.
-- [`OPERATING_MODEL.md`](OPERATING_MODEL.md) — roles, specification refinement, independent architecture deliberation, implementation review, decision records, and stop rules.
+- [`OPERATING_MODEL.md`](OPERATING_MODEL.md) — roles, interim PKR need intake, specification refinement, Architecture Review, implementation review, decision records, and stop rules.
 - [`DELIVERY_PLAN.md`](DELIVERY_PLAN.md) — phased implementation, transport spike, exit criteria, measured gates, and deferred capabilities.
 - [`BASELINE_EVIDENCE.md`](BASELINE_EVIDENCE.md) — mechanically checkable repository, pull-request, test, and PKR-state evidence that supports ratification.
 
@@ -91,6 +99,7 @@ Unless a later owner-ratified decision replaces them, this initiative does not p
 
 Owner ratification should confirm or amend:
 
+- the ATO and AR terminology and their separate identifier spaces;
 - the common task lifecycle;
 - the separation of task semantics, access, and orchestration;
 - read-only Claude and Codex as the first durable delivery slice;
