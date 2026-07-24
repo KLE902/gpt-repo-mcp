@@ -1,6 +1,6 @@
 # Agent Task Orchestration (ATO) Architecture
 
-Status: **proposed; owner ratification pending**.
+Status: **ratified by owner 2026-07-24**.
 
 ## 1. Architectural objective
 
