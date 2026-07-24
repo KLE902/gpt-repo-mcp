@@ -1,6 +1,6 @@
 # ATO-001 Phase 0.5 Claude Transport Spike Evidence
 
-Status: **implementation complete; measured ChatGPT-through-MCP execution pending**.
+Status: **measured spike complete — boundary failure; no validated Claude result**.
 
 This record separates implementation/component activity from the measured transport attempt required by [`ATO-001.md`](ATO-001.md). A local implementation process, component test, direct CLI call, or filesystem read is not accepted as proof of the target seam.
 
@@ -64,7 +64,7 @@ This section is not transport proof.
 
 ## Measured ChatGPT-through-MCP execution
 
-Not yet run at the time this section was created. The measured attempt begins only after the implementation is committed, built, and the supervised MCP runtime exposes the two fixed tools.
+The measured calls were made by ChatGPT through fixed GPT Repo MCP operations only. No direct Claude CLI call, shell execution, filesystem result read, attachment relay, Claude-UI action, owner prompt relay, or owner result relay was used.
 
 ### First measured attempt
 
@@ -80,50 +80,58 @@ The rerun record explicitly carries both measured start attempts and marks the r
 
 ### Final measured attempt
 
-Pending the single permitted rerun.
+After repair commit `ecd0d1482a181cc79b4fb25a05112cffd32388e2`, ChatGPT invoked `repo_run_allowed_script:mcp.ato001.start` for the single permitted rerun. PKR repository, branch, HEAD, cleanliness, origin synchronization, fixed task identity, and all ten context hashes passed preflight. Claude CLI resolution and version probing also completed, but capability verification failed closed with `ATO001_CLAUDE_CAPABILITY_UNVERIFIED`: the installed CLI did not expose the required `--max-turns` capability.
+
+Claude was not started, no task prompt reached the provider, no process tree was created, no provider output or usage existed, and the lease was not acquired because capability verification precedes lease acquisition.
+
+ChatGPT then invoked `repo_run_allowed_script:mcp.ato001.review`. It failed closed with `ATO001_EXECUTION_INVALID` because the preflight failure occurred before execution artifacts were created. Therefore no result was returned through MCP and no PKR intake result exists.
+
+A fixed non-provider diagnostic established Claude Code `2.1.217` and `loggedIn: true` through the first-party `claude.ai` authentication path. MCP's path-redaction hid the resolved executable paths, so an exact executable path is not claimed as delivered evidence.
 
 ## Required measurement record
 
-The terminal MCP review result is authoritative for the machine-recorded values below. This document will be updated from that returned result without reading run artifacts directly from the filesystem.
+No terminal result artifact exists because both measured starts stopped before provider execution. The values below come from the ChatGPT-visible MCP start, review, repository, and fixed non-provider diagnostic responses; no run artifact was read directly from the filesystem.
 
 | Measurement | Result |
 | --- | --- |
-| Exact Claude executable resolution | Pending |
-| Exact Claude CLI version | Pending |
-| Exact executed task-file identity | Pending |
-| Owner prompt relay count | Pending |
-| Owner result relay count | Pending |
-| ChatGPT MCP start call count and identity | Pending |
-| ChatGPT MCP review call count and identities | Pending |
-| Measured start initiated by ChatGPT through MCP | Pending |
-| Measured result retrieved by ChatGPT through MCP | Pending |
-| Owner terminal actions during run | Pending |
-| Owner PowerShell actions during run | Pending |
-| Owner filesystem actions during run | Pending |
-| Owner attachment actions during run | Pending |
-| Owner Claude-UI actions during run | Pending |
-| Prospective active owner administration time | Not retrospectively estimated |
-| Total elapsed time | Pending |
-| Claude task runtime | Pending |
-| Measured attempt count | Pending |
-| Narrow repair used | Pending |
-| Timeout outcome | Pending |
-| Process-tree termination outcome | Pending |
-| Output completeness | Pending |
-| Parsing and schema validation | Pending |
-| Repository and context boundary | Pending |
-| Read-lease outcome | Pending |
-| Usage and reported cost | Pending |
-| Remaining recurring setup/manual steps | Pending |
-| Owner-perceived administrative burden | Not yet recorded |
-| PKR interim-intake validity | Pending |
+| Exact Claude executable resolution | Resolution succeeded, but the two returned paths were redacted by MCP; exact path not claimable |
+| Exact Claude CLI version | `2.1.217 (Claude Code)` |
+| Non-interactive authentication | PASS — logged in through first-party `claude.ai` authentication |
+| Fixed task-file identity | Candidate task bytes verified exactly; SHA-256 `65a9986da526db3c1c5900f5a7129b8dd6ce9e2cbda13aebd21aba223ed48b16`; not executed |
+| Context identity | Ten exact ATO-001 files; aggregate SHA-256 `b749c7e2edc96895cce837f6f80faec14abe05bb72cb33a7adeb29c76545b65e` |
+| Owner prompt relay count | `0` |
+| Owner result relay count | `0` |
+| ChatGPT MCP start calls | `2`: `repo_run_allowed_script:mcp.ato001.start` first attempt and repaired rerun |
+| ChatGPT MCP review calls | `1`: `repo_run_allowed_script:mcp.ato001.review` |
+| Measured start initiated by ChatGPT through MCP | Yes, both attempts |
+| Measured result retrieved by ChatGPT through MCP | No — review failed closed before a result existed |
+| Owner terminal actions during run | `0` |
+| Owner PowerShell actions during run | `0` |
+| Owner filesystem actions during run | `0` |
+| Owner attachment actions during run | `0` |
+| Owner Claude-UI actions during run | `0` |
+| Prospective active owner administration time | Not measured; no retrospective estimate invented |
+| Measured MCP call elapsed time | First start `333 ms`; final start `1,912 ms`; final review `105 ms` |
+| Claude task runtime | `0 ms`; provider was never started |
+| Measured attempt count | `2` |
+| Narrow repair used | Yes, exactly once |
+| Timeout outcome | Not triggered |
+| Process-tree termination outcome | Not required; no provider process tree started |
+| Output completeness | No provider output exists |
+| Parsing and schema validation | Not reached |
+| Repository and context boundary | Start preflight passed on final attempt; post-attempt PKR state and hashes reverified unchanged |
+| Read-lease outcome | Not acquired in either measured attempt; runtime blocking therefore not exercised end-to-end |
+| Usage and reported cost | None reported; provider not invoked |
+| Remaining recurring setup/manual steps | Resolve or ratify a current-CLI bounded turn limit; expose exact resolved path safely; refresh connector catalog or retain fixed compatibility operations |
+| Owner-perceived administrative burden | Not recorded in this spike |
+| PKR interim-intake validity | No — no Claude result exists |
 
 ## Final classification
 
-Pending one of:
+**Proceed only after bounded changes. Do not begin Phase 1.**
 
-- proceed to Phase 1;
-- proceed only after bounded changes;
-- stop ATO development.
+The spike proved that ChatGPT can invoke fixed MCP-owned start and review operations without owner relay and that repository, task, context, authentication, and capability checks fail closed. It did **not** prove the target transport seam because the installed Claude Code `2.1.217` lacks the required `--max-turns` capability, the provider never started, no result returned through MCP, and the live-worktree lease was not exercised during a real run.
 
-No result may enter PKR interim need intake unless the terminal MCP review reports every transport, task-identity, parser, repository, context, output, and lease boundary as valid.
+A later work package must first decide the smallest truthful current-CLI equivalent for a bounded single-turn execution, or pin a compatible CLI version, while preserving the existing no-caller-input and read-only boundaries. That work must be separately measured; it is not a continuation or relabeling of this exhausted ATO-001 timebox.
+
+The PKR-004 position is diagnostic-only by absence: no Claude advisory result exists and nothing may enter PKR interim need intake.
