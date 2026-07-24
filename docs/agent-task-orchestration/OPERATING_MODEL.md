@@ -6,7 +6,7 @@ Status: **proposed; owner ratification pending**.
 
 Define how the owner, ChatGPT, GPT Repo MCP, Claude Code, and Codex collaborate after the common durable task lifecycle exists.
 
-The operating model removes manual transport while keeping decision authority, evidence boundaries, and provider roles explicit.
+The operating model removes manual transport while keeping decision authority, evidence boundaries, provider roles, and framing risk explicit.
 
 ## 2. Roles
 
@@ -20,13 +20,13 @@ The operating model removes manual transport while keeping decision authority, e
 
 ### ChatGPT coordinator and integrator
 
-- formulates a neutral task or decision brief;
+- drafts a task or decision brief that is treated as a reviewable input, not presumed neutral;
 - selects task kind, provider, context, access profile, and workflow;
 - creates and starts visible tasks through MCP;
 - prevents one provider's answer from anchoring another when independence is required;
 - compares results against project authority and available evidence;
 - produces the final synthesis or proposed task contract;
-- records unresolved conflicts and owner decisions;
+- records framing objections, unresolved conflicts, and owner decisions;
 - does not treat model agreement as proof.
 
 ChatGPT is not a third architecture advocate by default. A separate sealed ChatGPT position is an explicit high-stakes option, not the normal synthesis role.
@@ -112,7 +112,7 @@ The output is a usable task contract, not a transcript of debate.
 
 ### Decision brief
 
-ChatGPT produces one neutral brief containing:
+ChatGPT produces one brief containing:
 
 - the exact decision question;
 - why a decision is needed now;
@@ -123,12 +123,30 @@ ChatGPT produces one neutral brief containing:
 - shared context snapshot;
 - requested result structure.
 
+The brief is a draft input to the deliberation. It is not accepted as neutral merely because ChatGPT produced it.
+
+### Mandatory brief framing challenge
+
+Every independent architecture position begins with a review of the brief itself before answering the decision question.
+
+Each provider must state:
+
+- whether the question is neutrally framed;
+- whether material alternatives are missing or unfairly represented;
+- whether facts, assumptions, and owner preferences are separated;
+- whether relevant authority or evidence is absent;
+- whether any decision criterion is leading, incomplete, or inappropriate;
+- whether the question should be reframed before a decision is made.
+
+A material framing defect is not silently worked around. The provider may give a conditional position, but it must identify the corrected framing it relied on.
+
 ### Independent first positions
 
 Claude and Codex receive the same brief and context. Neither receives the other's result or a prior preferred recommendation.
 
 A position should state:
 
+- brief-framing objections;
 - recommendation;
 - assumptions;
 - reasoning and trade-offs;
@@ -142,6 +160,7 @@ A position should state:
 
 ChatGPT classifies:
 
+- framing objections and their disposition;
 - real agreement;
 - apparent agreement based on different assumptions;
 - material conflict;
@@ -150,7 +169,7 @@ ChatGPT classifies:
 - missing project evidence;
 - product or governance choices that belong to the owner.
 
-The synthesis recommends a decision but does not claim that agreement proves correctness.
+If either provider identifies a material framing defect, ChatGPT must resolve or surface that objection before recommending a decision. The synthesis recommends a decision but does not claim that agreement proves correctness.
 
 ### Rebuttal rule
 
@@ -237,6 +256,8 @@ The snapshot should include only relevant authority and evidence. It must distin
 
 Historical pilot documents do not silently become current workflow authority.
 
+A result invalidated by `context_drifted` is retained for diagnosis but is not used in synthesis or decision ratification.
+
 ## 10. Evidence hierarchy
 
 When sources conflict, use this order unless the task defines a stricter rule:
@@ -279,7 +300,9 @@ A multi-agent delivery is justified only when decomposition reduces elapsed time
 Stop the workflow and return to the owner when:
 
 - providers disagree on a product preference rather than an engineering fact;
+- the brief has a material unresolved framing defect;
 - required evidence cannot be obtained safely;
+- repository or context identity drifts during a run;
 - the task would require a new unratified security boundary;
 - two write scopes overlap materially without an integration plan;
 - the cost of coordination exceeds the value of the change;

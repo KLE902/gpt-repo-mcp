@@ -16,22 +16,27 @@ Implementation belongs in GPT Repo MCP. PKR supplies real decision and delivery 
 - Generalize from two concrete providers, not from imagined future providers.
 - Stabilize task lifecycle and result wrapper; defer rich semantic schemas.
 - Keep orchestration visible in ChatGPT and durable facts in MCP.
+- Treat the decision brief as reviewable input.
+- Fail closed on repository or context drift.
 - Do not make PKR product delivery wait for optional orchestration sophistication.
 
 ## 3. Phase 0 — Ratify the foundation
 
 ### Scope
 
-- Review and ratify this document set.
+- Review and ratify this document set and its mechanical baseline evidence.
+- Record a bounded estimate of how often manual ChatGPT ↔ Claude ↔ Codex transport occurs and how much owner effort it consumes.
 - Record the architectural decision that the project uses a common durable task lifecycle with provider adapters.
 - Confirm `provider`, `task_kind`, `access_profile`, and `orchestration` as separate axes.
-- Confirm context snapshots, open ChatGPT coordination, owner-ratified decision records, one writer per worktree, and bounded rounds.
+- Confirm context snapshots, provider framing challenge, open ChatGPT coordination, owner-ratified decision records, one writer per worktree, and bounded rounds.
 - Confirm the permanent non-goals.
 
 ### Deliverables
 
 - ratified architecture direction;
-- explicit success metric for Phase 1;
+- verified baseline evidence for current Codex, Claude-probe, pull-request, and PKR-state claims;
+- documented frequency and effort estimate for the current transport problem;
+- explicit success metric for the transport spike and Phase 1;
 - bounded first dogfooding question;
 - list of current Codex behaviors that must remain unchanged.
 
@@ -39,23 +44,52 @@ Implementation belongs in GPT Repo MCP. PKR supplies real decision and delivery 
 
 - no unresolved disagreement about the create/start/review seam;
 - no hidden requirement for a general inline dispatch or command runner;
-- first implementation slice is limited to durable read-only tasks.
+- the current baseline is mechanically verified;
+- the transport problem is frequent or costly enough to justify at least the bounded spike;
+- the first durable implementation slice remains limited to read-only tasks.
 
 ### Timebox
 
-This is a decision batch, not a prolonged design programme. It ends when implementation constraints are clear enough for Phase 1.
+This is a decision batch, not a prolonged design programme. It ends when implementation constraints are clear enough for the bounded transport spike.
+
+## 3.5. Phase 0.5 — Bounded transport spike
+
+### Purpose
+
+Test the user value and host boundary of direct Claude transport before committing to the full provider-neutral lifecycle refactor.
+
+### Scope
+
+- use one fixed read-only task file against an exact repository and HEAD;
+- start Claude through a server-owned allowlisted wrapper or equally bounded temporary MCP path;
+- collect structured output into a deterministic local result artifact;
+- return that result to ChatGPT through MCP without owner copy-paste;
+- verify unchanged branch, HEAD, index, worktree, and declared context hashes;
+- timebox the spike and treat its code as disposable unless it cleanly fits the later lifecycle.
+
+The spike is not a second permanent Claude runner, a generic dispatch tool, or a substitute for the Phase 1 contracts.
+
+### Exit criteria
+
+- ChatGPT starts one real Claude analysis without the owner relaying the prompt;
+- ChatGPT receives the result without the owner relaying the response;
+- the read-only and context boundaries either pass or fail with an explicit classification;
+- owner effort, elapsed time, and residual manual steps are recorded;
+- the owner decides whether the measured value justifies Phase 1.
+
+A spike that still requires manual result transport does not satisfy the purpose.
 
 ## 4. Phase 1 — Common durable read-only task lifecycle
 
 ### Scope
 
-- Introduce a provider-neutral task package and result wrapper under new schema versions.
-- Extract only lifecycle services shared by current Codex execution and read-only providers.
-- Implement `ClaudeReadOnlyAdapter` and `CodexReadOnlyAdapter`.
-- Bind tasks to exact repository, branch, HEAD, and context snapshot.
-- Add server-owned structured-output validation.
-- Expose narrow create, start, and review operations.
-- Preserve existing Codex-specific tool behavior through compatibility or unchanged paths.
+- introduce a provider-neutral task package and result wrapper under new schema versions;
+- extract only lifecycle services shared by current Codex execution and read-only providers;
+- implement `ClaudeReadOnlyAdapter` and `CodexReadOnlyAdapter`;
+- bind tasks to exact repository, branch, HEAD, and context snapshot;
+- add server-owned structured-output validation;
+- expose narrow create, start, and review operations;
+- preserve existing Codex-specific tool behavior through compatibility or unchanged paths.
 
 ### Claude verification work
 
@@ -77,10 +111,12 @@ A real PKR architecture question is dispatched independently to Claude and Codex
 
 The run must demonstrate:
 
-- same verified decision brief and context snapshot;
+- the same verified decision brief and context snapshot;
+- mandatory brief-framing challenge in each independent position;
 - separate durable run identities;
 - complete, validated results;
-- unchanged repository state;
+- unchanged repository state and context hashes at result collection;
+- fail-closed `context_drifted` classification when pinned input changes;
 - bounded usage and runtime;
 - readable failure classification;
 - no regression to durable Codex execution.
@@ -91,28 +127,40 @@ If manual relay is still required, Phase 1 has failed regardless of code quality
 
 ### Scope
 
-- Select one material, genuinely uncertain PKR architecture decision.
-- Produce a neutral decision brief and decision criteria.
-- Run blind independent Claude and Codex positions.
-- Synthesize agreement, assumptions, conflicts, evidence gaps, and owner decisions.
-- Use at most one targeted rebuttal round.
-- Produce a proposed decision record for owner ratification.
+- select one material, genuinely uncertain PKR architecture decision;
+- produce a decision brief and decision criteria;
+- require both providers to challenge the brief framing before answering;
+- run blind independent Claude and Codex positions;
+- synthesize framing objections, agreement, assumptions, conflicts, evidence gaps, and owner decisions;
+- use at most one targeted rebuttal round;
+- produce a proposed decision record for owner ratification.
 
-### Measurements
+### Objective observations
 
 - manual transport steps eliminated;
-- number of provider runs and total usage;
+- owner time spent on transport and coordination;
+- number of provider runs, elapsed time, tokens, and reported cost;
 - new material considerations discovered;
 - false or unsupported findings;
-- owner effort compared with the current copy-paste loop;
-- whether independence was preserved;
-- whether the final decision improved over one strong model plus owner review.
+- whether independent first positions were preserved;
+- whether a rebuttal round was needed.
+
+### Owner assessment
+
+The owner records a separate subjective judgment:
+
+- whether the synthesis was useful;
+- whether the decision felt better supported;
+- whether the additional perspective justified the cost;
+- whether the workflow should be repeated, simplified, or rejected.
+
+This assessment is decision input, not a controlled counterfactual measurement against an unknowable one-model outcome.
 
 ### Exit decision
 
 - **Adopt:** measurable reduction in owner transport with useful independent analysis.
-- **Adopt with changes:** transport succeeds but context, result, or synthesis contract needs bounded correction.
-- **Reject or simplify:** the workflow adds cost without improving the decision.
+- **Adopt with changes:** transport succeeds but context, result, brief, or synthesis contract needs bounded correction.
+- **Reject or simplify:** the workflow adds cost without sufficient owner-assessed value.
 
 Do not build convergence engines, automatic recursive debate, or a deliberation database as part of this pilot.
 
@@ -120,10 +168,10 @@ Do not build convergence engines, automatic recursive debate, or a deliberation 
 
 ### Scope
 
-- Add `spec_draft` and `spec_critique` task kinds.
-- Allow the critique task to reference the draft task explicitly.
-- Generate a final implementation contract through ChatGPT synthesis.
-- Dogfood on one real PKR product batch.
+- add `spec_draft` and `spec_critique` task kinds;
+- allow the critique task to reference the draft task explicitly;
+- generate a final implementation contract through ChatGPT synthesis;
+- dogfood on one real PKR product batch.
 
 ### Exit criteria
 
@@ -225,10 +273,12 @@ The infrastructure work must not silently reorder PKR's backlog.
 
 | Risk | Control |
 | --- | --- |
-| Control plane grows faster than PKR | Phase gates require a real PKR value test. |
+| Control plane grows faster than PKR | Phase 0.5 and later gates require measured PKR value. |
 | Generic task tool becomes a command runner | Separate immutable task creation from narrow start; server-owned invocation. |
 | Provider roles become permanent | Roles selected per task; provider is an independent field. |
-| Claude read-only boundary is assumed rather than proven | End-to-end host probe plus unchanged repository verification. |
+| ChatGPT framing anchors both providers | Mandatory provider challenge of brief framing and context selection. |
+| Claude read-only boundary is assumed rather than proven | End-to-end host probe plus unchanged repository and context verification. |
+| Live worktree changes during read-only analysis | Start-and-result hash checks, fail-closed drift, preferred immutable snapshot. |
 | Codex guarantees regress during generalization | Compatibility path and exact regression coverage before migration. |
 | Deliberation becomes recursive and expensive | One initial round, one targeted rebuttal maximum. |
 | Multi-agent component success masks integration failure | Separate integration task and integrated HEAD gate. |
@@ -237,11 +287,15 @@ The infrastructure work must not silently reorder PKR's backlog.
 
 ## 12. Immediate next batch after ratification
 
-A focused GPT Repo MCP architecture-and-contract batch should:
+After ratification:
 
-1. inspect the current Codex task, execution, review, process, policy, and contract layers;
-2. define the smallest provider-neutral task and result wrapper needed for read-only runs;
-3. specify compatibility with current Codex tools and artifacts;
-4. verify the Claude CLI boundary on the installed version and Windows runtime;
-5. produce an implementation plan for Phase 1;
-6. stop before broad provider routing, write support, deterministic claims, or multi-agent delivery machinery.
+1. confirm [`BASELINE_EVIDENCE.md`](BASELINE_EVIDENCE.md) against the exact branch and host state;
+2. record the current manual transport frequency and effort estimate;
+3. implement and run the bounded Phase 0.5 transport spike;
+4. decide from measured value whether Phase 1 proceeds;
+5. if approved, inspect the current Codex task, execution, review, process, policy, and contract layers;
+6. define the smallest provider-neutral task and result wrapper needed for read-only runs;
+7. specify compatibility with current Codex tools and artifacts;
+8. verify the Claude CLI boundary on the installed version and Windows runtime;
+9. produce the final implementation plan for Phase 1;
+10. stop before broad provider routing, write support, deterministic claims, or multi-agent delivery machinery.

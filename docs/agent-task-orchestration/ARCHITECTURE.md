@@ -145,7 +145,7 @@ Task semantics, access, and orchestration are separate axes:
 
 No provider is permanently assigned to drafting, architecture, implementation, or review.
 
-## 7. Context snapshots
+## 7. Context snapshots and read consistency
 
 A context snapshot binds the task to exact project authority rather than embedding uncontrolled or stale copies in the caller's prompt.
 
@@ -157,7 +157,18 @@ The snapshot records:
 - content hashes or an equivalent exact identity mechanism;
 - exclusions and maximum context limits.
 
-The provider reads the actual repository files. The manifest proves which material was intended and detects drift between task creation and execution.
+The provider reads the actual repository files. The manifest proves which material was intended.
+
+For every read-only run, MCP must verify repository identity, branch, HEAD, clean state, and every declared context hash immediately before provider start and again when collecting the result. Any mismatch is classified fail-closed as `context_drifted`. Logs and provider output are retained for diagnosis, but the structured result is invalid for synthesis, review, or decision ratification.
+
+Start-and-result verification is the minimum initial implementation. It does not detect a file that changes temporarily during execution and is restored before result collection. The preferred stable design is therefore an immutable read snapshot pinned to the exact commit, such as a server-owned detached worktree or equivalent materialized snapshot.
+
+A live-worktree implementation must:
+
+- document the residual race;
+- prevent known concurrent MCP writers while the read lease is active;
+- verify branch, HEAD, index, worktree, and context hashes at start and collection;
+- fail closed rather than downgrade drift to a warning.
 
 For PKR, typical authority may include `AGENTS.md`, `PROJECT_STATE.md`, `FEATURES.md`, the design specification, the active backlog item, relevant architecture decisions, and targeted implementation files. Selection remains task-specific; every task does not automatically receive the whole repository.
 
@@ -186,6 +197,8 @@ The durable result wrapper is part of the stable seam:
 
 Provider-supported schema output may be used, but MCP parses and validates every result independently. Provider enforcement is not the trust boundary.
 
+A terminal process state and a valid payload are not sufficient when the context or execution boundary is invalid. The durable review surface must expose both the provider status and the boundary classification.
+
 ## 9. Provider adapters
 
 ### Shared responsibilities
@@ -195,13 +208,14 @@ Every adapter must provide:
 - verified CLI resolution and version reporting;
 - non-interactive authentication verification;
 - fixed server-owned invocation;
-- explicit repository working directory;
+- explicit repository or immutable-snapshot working directory;
 - bounded and redacted output;
 - timeout and complete process-tree termination;
 - structured-output parsing;
 - MCP-owned schema validation;
 - safe error classification;
-- unchanged repository verification for read-only tasks.
+- unchanged repository and context verification for read-only tasks;
+- invalidation on any context drift.
 
 ### Codex adapters
 
@@ -220,9 +234,9 @@ Its exact invocation must be established through implementation-time capability 
 - explicit tool exposure or denial;
 - bounded turns, timeout, and cost when supported;
 - no Edit, Write, NotebookEdit, or unrestricted Bash;
-- unchanged branch, HEAD, index, and worktree after execution.
+- unchanged branch, HEAD, index, worktree, and context hashes after execution.
 
-`--bare`, permission modes, tool allowlists, and authentication behavior must be verified together. No individual Claude flag is assumed to be a complete read-only sandbox.
+`--bare`, permission modes, tool allowlists, authentication behavior, and repository access must be verified together. No individual Claude flag is assumed to be a complete read-only sandbox.
 
 ### Claude workspace-write adapter
 
@@ -307,6 +321,7 @@ The architecture must preserve:
 - no arbitrary caller-supplied executable or command;
 - no prompt, provider flags, tool permissions, or environment supplied at start time;
 - exact repository, branch, and HEAD guards;
+- start-and-result context verification with fail-closed `context_drifted` classification;
 - immutable task identity and prompt hash;
 - server-owned provider invocation and environment allowlist;
 - read-only verification for read-only tasks;

@@ -25,6 +25,8 @@ As of July 2026:
 - the Claude CLI supports a bounded non-interactive read-only capability probe with structured output;
 - durable Claude tasks, provider-neutral task packages, automated architecture deliberation, and multi-agent write delivery are not implemented.
 
+The mechanical evidence behind these statements is recorded in [`BASELINE_EVIDENCE.md`](BASELINE_EVIDENCE.md). Host-local capability claims must be re-probed before implementation because installed versions, authentication, and runtime configuration may change.
+
 Current capability remains defined by the implemented tools and effective local policy. This proposal does not claim that future capabilities already exist.
 
 ## Decision summary
@@ -36,11 +38,14 @@ The proposed direction is:
 3. Put provider-specific CLI behavior behind adapters.
 4. Keep `provider`, `task_kind`, `access_profile`, and `orchestration` as separate concepts.
 5. Bind each task to an exact context snapshot of repository authority files and task-specific files.
-6. Let ChatGPT coordinate visible tasks and synthesize results. MCP owns transport, durable state, policy, and execution boundaries; it is not a hidden multiagent engine.
-7. Use one writer per worktree. Read-only tasks may run independently; concurrent writers require separate worktrees and later integration verification.
-8. End architecture work in a proposed decision record. The owner ratifies the decision before authoritative project documentation changes.
-9. Fix only a small, versioned result wrapper initially. Let task-specific structured payloads evolve from real use.
-10. Add deterministic claim verification only when observed false-completion risk, delivery scale, or multi-agent integration makes it worthwhile.
+6. Treat the decision brief itself as reviewable input. Independent providers must challenge framing, missing alternatives, and context selection before answering.
+7. Let ChatGPT coordinate visible tasks and synthesize results. MCP owns transport, durable state, policy, and execution boundaries; it is not a hidden multiagent engine.
+8. Use one writer per worktree. Read-only tasks may run independently; concurrent writers require separate worktrees and later integration verification.
+9. Fail closed when repository or context identity changes during a read-only run. Prefer an immutable read snapshot pinned to an exact commit when the implementation can support it.
+10. End architecture work in a proposed decision record. The owner ratifies the decision before authoritative project documentation changes.
+11. Fix only a small, versioned result wrapper initially. Let task-specific structured payloads evolve from real use.
+12. Prove direct Claude transport with a bounded spike before committing to the full provider-neutral lifecycle refactor.
+13. Add deterministic claim verification only when observed false-completion risk, delivery scale, or multi-agent integration makes it worthwhile.
 
 ## Project success criterion
 
@@ -64,7 +69,8 @@ The PKR repository remains the consumer and dogfooding environment. GPT Repo MCP
 
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — target boundaries, task lifecycle, manifests, adapters, context snapshots, security invariants, and future multi-agent extension points.
 - [`OPERATING_MODEL.md`](OPERATING_MODEL.md) — roles, specification refinement, independent architecture deliberation, implementation review, decision records, and stop rules.
-- [`DELIVERY_PLAN.md`](DELIVERY_PLAN.md) — phased implementation, exit criteria, measured gates, and deferred capabilities.
+- [`DELIVERY_PLAN.md`](DELIVERY_PLAN.md) — phased implementation, transport spike, exit criteria, measured gates, and deferred capabilities.
+- [`BASELINE_EVIDENCE.md`](BASELINE_EVIDENCE.md) — mechanically checkable repository, pull-request, test, and PKR-state evidence that supports ratification.
 
 ## Permanent non-goals
 
@@ -87,7 +93,10 @@ Owner ratification should confirm or amend:
 
 - the common task lifecycle;
 - the separation of task semantics, access, and orchestration;
-- read-only Claude and Codex as the first delivery slice;
+- read-only Claude and Codex as the first durable delivery slice;
 - open ChatGPT coordination instead of hidden MCP orchestration;
+- mandatory provider challenge of decision-brief framing;
+- fail-closed context-drift handling and the preferred immutable read-snapshot direction;
+- a bounded transport spike before the full provider-neutral lifecycle build;
 - context snapshots and proposed decision records;
-- the phase gates and non-goals in this document set.
+- the phase gates, evidence baseline, and non-goals in this document set.
