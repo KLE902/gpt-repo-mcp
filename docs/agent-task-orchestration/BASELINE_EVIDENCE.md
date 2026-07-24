@@ -1,6 +1,6 @@
 # Agent Task Orchestration Baseline Evidence
 
-Status: **verified evidence supporting proposed ratification**.
+Status: **verified evidence supporting the ratified foundation; host re-probed 2026-07-24**.
 
 Verified on: **2026-07-24**.
 
@@ -28,6 +28,13 @@ Merged capability pull requests:
 | #19 | Fail-closed Codex sandbox boundary enforcement | `176b91ae9a690f459dc738c4074f1242d2a6f47f` | Node 20, Node 22, Windows desktop launcher: success |
 
 All three pull requests are merged and closed against `main`.
+
+Post-ratification repository state:
+
+- PR #20, `Document agent task orchestration foundation`, is merged and closed; reviewed head `8b17219bc3ffe6a5d2c9932237fb74b6d8647eaf`;
+- PR #21, `Ratify agent task orchestration foundation`, is merged and closed; reviewed head `31ba498332fb5039071b70dc53ea8bbaf7c49dc3`;
+- local and `origin/main`: `e2ee290d9b17b87791ff2b7462764aa0ef35e712`;
+- worktree: clean.
 
 ## 3. Implemented Codex contract evidence
 
@@ -107,7 +114,14 @@ The following was operationally verified during the completed post-merge workstr
 - the Codex smoke artifact and run directory were cleaned up;
 - normal repository policy was restored with `codex_task_run_enabled: false`.
 
-These facts depend on the current Windows host, installed CLI versions, authentication, and local configuration. Before the Phase 0.5 spike or Phase 1 implementation, the exact host must re-run the relevant capability probes and record current versions and outcomes. Repository tests alone do not prove current host readiness.
+The exact Windows host was re-probed on 2026-07-24 against clean Premium-Komga-Reader `master` at `6036e56fb54ca332824fa9f26c48a82ae56110dd`:
+
+- Codex capability/authentication and workspace-write sandbox verification passed with `codex-cli 0.145.0`; branch, HEAD, index, and worktree remained unchanged;
+- the Claude capability/authentication invocation reached the provider but failed closed as `PROBE_MARKER_MISSING`; the current output did not satisfy the exact structured marker contract;
+- the Claude failure was not converted to success or warning, and no repository mutation was reported;
+- the exact current Claude result shape and compatible bounded parsing remain implementation evidence for ATO-001, not a presumed capability.
+
+Host-local facts depend on installed CLI versions, authentication, and runtime configuration. The Phase 0.5 spike must preserve fail-closed handling and record the exact current Claude version, invocation capabilities, output shape, and repository/context checks before claiming transport success. Repository tests alone do not prove current host readiness.
 
 ## 6. PKR pilot and project-state evidence
 
