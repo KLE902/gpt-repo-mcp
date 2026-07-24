@@ -76,14 +76,14 @@ export class Ato001ClaudeStartService {
       throw new RepoReaderError("ATO001_REPOSITORY_DRIFT", "PKR changed during Claude preflight.");
     }
 
-    const lease = new Ato001ReadLease(this.repoRoot);
+    const lease = new Ato001ReadLease(this.projectRoot);
     const startedAt = this.now();
-    const artifactDirectory = this.absolute(ATO001_ARTIFACT_DIRECTORY);
+    const artifactDirectory = this.artifactAbsolute(ATO001_ARTIFACT_DIRECTORY);
     const state = initialState(startedAt);
     await lease.acquireForStart(startedAt, async () => {
       await mkdir(artifactDirectory, { recursive: true });
-      await writeFile(this.absolute(ATO001_ARTIFACT_PATHS.task), taskBytes, { flag: "wx" });
-      await writeJson(this.absolute(ATO001_ARTIFACT_PATHS.metadata), {
+      await writeFile(this.artifactAbsolute(ATO001_ARTIFACT_PATHS.task), taskBytes, { flag: "wx" });
+      await writeJson(this.artifactAbsolute(ATO001_ARTIFACT_PATHS.metadata), {
         schema_version: 1,
         run_id: ATO001_RUN_ID,
         repo_id: ATO001_REPO_ID,
@@ -107,8 +107,8 @@ export class Ato001ClaudeStartService {
         residual_risk: "The live-worktree lease blocks known MCP mutations only; external host processes remain outside MCP control.",
         created_at: startedAt.toISOString()
       });
-      await writeJson(this.absolute(ATO001_ARTIFACT_PATHS.state), state);
-      await writeJson(this.absolute(ATO001_ARTIFACT_PATHS.measurements), initialMeasurements(call));
+      await writeJson(this.artifactAbsolute(ATO001_ARTIFACT_PATHS.state), state);
+      await writeJson(this.artifactAbsolute(ATO001_ARTIFACT_PATHS.measurements), initialMeasurements(call));
     });
 
     let launched: { pid: number };
@@ -116,7 +116,7 @@ export class Ato001ClaudeStartService {
       launched = await this.launchRunner!({
         runnerPath: resolve(this.projectRoot, "scripts", "ato-001-claude-runner.mjs"),
         repoRoot: this.repoRoot,
-        taskPath: this.absolute(ATO001_ARTIFACT_PATHS.task),
+        taskPath: this.artifactAbsolute(ATO001_ARTIFACT_PATHS.task),
         artifactDirectory
       });
     } catch {
@@ -130,7 +130,7 @@ export class Ato001ClaudeStartService {
         terminal_classification: "ATO001_RUNNER_START_FAILED",
         diagnostic: "The bounded Claude runner could not be started."
       };
-      await writeJson(this.absolute(ATO001_ARTIFACT_PATHS.state), failed);
+      await writeJson(this.artifactAbsolute(ATO001_ARTIFACT_PATHS.state), failed);
       throw new RepoReaderError("ATO001_RUNNER_START_FAILED", "The bounded ATO-001 Claude runner could not be started; call the fixed review tool to release the lease.");
     }
 
@@ -153,7 +153,7 @@ export class Ato001ClaudeStartService {
           diagnostic: "The bounded Claude runner did not confirm startup within the startup window.",
           process_tree_termination_outcome: terminated ? "verified_complete" : "requested_unverified"
         };
-        await writeJson(this.absolute(ATO001_ARTIFACT_PATHS.state), failed);
+        await writeJson(this.artifactAbsolute(ATO001_ARTIFACT_PATHS.state), failed);
       }
       throw error;
     }
@@ -185,7 +185,7 @@ export class Ato001ClaudeStartService {
 
   private async readState(): Promise<Ato001ExecutionState> {
     try {
-      return Ato001ExecutionStateSchema.parse(JSON.parse(await readFile(this.absolute(ATO001_ARTIFACT_PATHS.state), "utf8")));
+      return Ato001ExecutionStateSchema.parse(JSON.parse(await readFile(this.artifactAbsolute(ATO001_ARTIFACT_PATHS.state), "utf8")));
     } catch {
       throw new RepoReaderError("ATO001_EXECUTION_INVALID", "ATO-001 execution state is missing or malformed.");
     }
@@ -194,7 +194,7 @@ export class Ato001ClaudeStartService {
   private async assertArtifactsAbsent(): Promise<void> {
     for (const path of Object.values(ATO001_ARTIFACT_PATHS)) {
       try {
-        await access(this.absolute(path));
+        await access(this.artifactAbsolute(path));
         throw new RepoReaderError("ATO001_RUN_EXISTS", `Fixed ATO-001 artifact already exists: ${basename(path)}`);
       } catch (error) {
         if (isNotFound(error)) continue;
@@ -207,17 +207,17 @@ export class Ato001ClaudeStartService {
     for (const path of ato001ArtifactPaths()) {
       const ignored = await new Promise<boolean>((resolveIgnored) => {
         execFile("git", ["check-ignore", "-q", "--", path], {
-          cwd: this.repoRoot,
+          cwd: this.projectRoot,
           windowsHide: true,
           timeout: 30_000
         }, (error) => resolveIgnored(!error));
       });
-      if (!ignored) throw new RepoReaderError("ATO001_ARTIFACTS_NOT_IGNORED", `ATO-001 artifact path is not ignored by PKR Git: ${path}`);
+      if (!ignored) throw new RepoReaderError("ATO001_ARTIFACTS_NOT_IGNORED", `ATO-001 artifact path is not ignored by GPT Repo MCP Git: ${path}`);
     }
   }
 
-  private absolute(path: string): string {
-    return join(this.repoRoot, ...path.split("/"));
+  private artifactAbsolute(path: string): string {
+    return join(this.projectRoot, ...path.split("/"));
   }
 }
 
@@ -284,7 +284,15 @@ function initialMeasurements(call: { call_id: string; recorded_at: string; tool:
   return {
     owner_prompt_relay_count: 0,
     owner_result_relay_count: 0,
-    chatgpt_mcp_start_calls: [call],
+    chatgpt_mcp_start_calls: [
+      {
+        call_id: "measured-start-attempt-1",
+        tool: "repo_run_allowed_script:mcp.ato001.start",
+        recorded_at: null,
+        outcome: "failed_closed_before_provider:ATO001_ARTIFACTS_NOT_IGNORED"
+      },
+      { ...call, outcome: "accepted_for_execution_after_narrow_repair" }
+    ],
     chatgpt_mcp_review_calls: [],
     measured_start_via_chatgpt_mcp: true,
     measured_result_retrieval_via_chatgpt_mcp: false,
@@ -292,8 +300,8 @@ function initialMeasurements(call: { call_id: string; recorded_at: string; tool:
     prospective_active_owner_administration_ms: null,
     total_elapsed_ms: null,
     task_runtime_ms: null,
-    measured_attempt_count: 1,
-    narrow_repair_used: false,
+    measured_attempt_count: 2,
+    narrow_repair_used: true,
     timeout_outcome: "pending",
     process_tree_termination_outcome: "not_required",
     output_complete: false,

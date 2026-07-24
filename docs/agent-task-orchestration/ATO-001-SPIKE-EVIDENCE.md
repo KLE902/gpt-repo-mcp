@@ -68,15 +68,19 @@ Not yet run at the time this section was created. The measured attempt begins on
 
 ### First measured attempt
 
-Pending.
+`repo_run_allowed_script:mcp.ato001.start` was invoked by ChatGPT after implementation commit `282bb0a5fd367746d6a427578167bb730d3d7193`. It failed closed before Claude started with `ATO001_ARTIFACTS_NOT_IGNORED`: the first implementation placed MCP-owned artifacts under the pinned PKR live worktree and required that path to be ignored there.
+
+This is an informative boundary failure, not transport success. No task prompt reached Claude, no PKR file changed, no lease was acquired, and no owner relay or local owner action occurred.
 
 ### Permitted narrow repair
 
-Not used.
+Used once. The fixed task, execution state, result, measurements, and mutation lease were moved from the pinned PKR worktree to GPT Repo MCP's existing ignored `.chatgpt/` runtime area. PKR remains only the verified read-only target. The same start/review services, fixed invocation, result parser, and live-worktree mutation guard remain in force.
+
+The rerun record explicitly carries both measured start attempts and marks the repair as used.
 
 ### Final measured attempt
 
-Pending.
+Pending the single permitted rerun.
 
 ## Required measurement record
 

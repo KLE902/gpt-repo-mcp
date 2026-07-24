@@ -491,7 +491,7 @@ export const startAto001ClaudeHandler: ToolHandler = async (input, context) => s
 export const ato001ClaudeReviewHandler: ToolHandler = async (input, context) => safeTool<Record<string, never>>("repo_ato_001_claude_review", input, context, async () => {
   const repo = context.registry.get(ATO001_REPO_ID);
   new OperationsPolicy(repo.operations).assertAto001ClaudeAllowed();
-  const result = await new Ato001ClaudeReviewService(repo.root).review({ call_id: randomUUID(), recorded_at: new Date().toISOString(), tool: "repo_ato_001_claude_review" });
+  const result = await new Ato001ClaudeReviewService(repo.root, { artifactRoot: process.cwd() }).review({ call_id: randomUUID(), recorded_at: new Date().toISOString(), tool: "repo_ato_001_claude_review" });
   audit({
     tool: "repo_ato_001_claude_review",
     repo_id: ATO001_REPO_ID,
@@ -603,8 +603,7 @@ async function safeTool<TInput extends Record<string, unknown>>(
     const args = input as TInput;
     const repoId = typeof input === "object" && input && "repo_id" in input ? String(input.repo_id) : undefined;
     if (repoId === ATO001_REPO_ID && isMutatingToolName(tool) && tool !== "repo_start_ato_001_claude") {
-      const repo = context.registry.get(repoId);
-      return await new Ato001ReadLease(repo.root).withMutationGuard(() => run(args));
+      return await new Ato001ReadLease(process.cwd()).withMutationGuard(() => run(args));
     }
     return await run(args);
   } catch (error) {

@@ -24,6 +24,7 @@ import { Ato001RepositoryVerifier } from "./ato-001-repository-verifier.js";
 type ReviewDependencies = {
   verifyRepository?: () => Promise<unknown>;
   now?: () => Date;
+  artifactRoot?: string;
 };
 
 type ReviewCall = { call_id: string; recorded_at: string; tool: string };
@@ -32,6 +33,7 @@ type Measurements = ReturnType<typeof Ato001MeasurementsSchema.parse>;
 export class Ato001ClaudeReviewService {
   private readonly verifyRepository: () => Promise<unknown>;
   private readonly now: () => Date;
+  private readonly artifactRoot: string;
 
   constructor(
     private readonly repoRoot: string,
@@ -39,12 +41,13 @@ export class Ato001ClaudeReviewService {
   ) {
     this.verifyRepository = dependencies.verifyRepository ?? (() => new Ato001RepositoryVerifier(repoRoot).verify());
     this.now = dependencies.now ?? (() => new Date());
+    this.artifactRoot = dependencies.artifactRoot ?? repoRoot;
   }
 
   async review(call: ReviewCall): Promise<Ato001ClaudeReviewResult> {
     let state = await this.readState();
     let measurements = await this.recordReviewCall(call, state.terminal);
-    const lease = new Ato001ReadLease(this.repoRoot);
+    const lease = new Ato001ReadLease(this.artifactRoot);
     if (!state.terminal) {
       return this.buildResult(state, null, null, false, await lease.isActive(), measurements);
     }
@@ -225,7 +228,7 @@ export class Ato001ClaudeReviewService {
   }
 
   private absolute(path: string): string {
-    return join(this.repoRoot, ...path.split("/"));
+    return join(this.artifactRoot, ...path.split("/"));
   }
 }
 

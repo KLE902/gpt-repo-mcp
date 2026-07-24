@@ -28,7 +28,7 @@ async function main(): Promise<void> {
 
   const result = operation === "start"
     ? await new Ato001ClaudeStartService(repo.root, cwd).start(call)
-    : await new Ato001ClaudeReviewService(repo.root).review(call);
+    : await new Ato001ClaudeReviewService(repo.root, { artifactRoot: cwd }).review(call);
 
   process.stdout.write(`${JSON.stringify(result)}\n`);
 }

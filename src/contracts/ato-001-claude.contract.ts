@@ -3,9 +3,10 @@ import { z } from "zod";
 const Sha256Schema = z.string().regex(/^[0-9a-f]{64}$/);
 const IsoDateSchema = z.string().datetime({ offset: true });
 const Ato001McpCallSchema = z.object({
-  call_id: z.string().uuid(),
+  call_id: z.string().min(1).max(128),
   tool: z.string().min(1).max(128),
-  recorded_at: IsoDateSchema
+  recorded_at: IsoDateSchema.nullable(),
+  outcome: z.string().min(1).max(256).optional()
 }).strict();
 
 export const Ato001ClaudeStartInputSchema = z.object({}).strict();
