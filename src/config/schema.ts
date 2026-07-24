@@ -37,7 +37,6 @@ export const OperationsPolicyConfigSchema = z.object({
   codex_task_max_runtime_ms: z.number().int().min(1000).max(7_200_000).default(DEFAULT_OPERATIONS_POLICY.codex_task_max_runtime_ms),
   codex_task_max_output_bytes: z.number().int().min(1024).max(1_048_576).default(DEFAULT_OPERATIONS_POLICY.codex_task_max_output_bytes),
   codex_task_inherit_env: z.array(z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/)).max(64).default(DEFAULT_OPERATIONS_POLICY.codex_task_inherit_env),
-  claude_ato_001_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.claude_ato_001_enabled),
   max_paths_per_operation: PositiveIntSchema.default(DEFAULT_OPERATIONS_POLICY.max_paths_per_operation),
   cleanup_enabled: z.boolean().default(DEFAULT_OPERATIONS_POLICY.cleanup_enabled),
   cleanup_allowed_globs: z.array(z.string()).default(DEFAULT_OPERATIONS_POLICY.cleanup_allowed_globs)

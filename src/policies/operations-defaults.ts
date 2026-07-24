@@ -16,7 +16,6 @@ export const DEFAULT_OPERATIONS_POLICY = {
   codex_task_max_runtime_ms: 1_800_000,
   codex_task_max_output_bytes: 1_048_576,
   codex_task_inherit_env: [],
-  claude_ato_001_enabled: false,
   max_paths_per_operation: 50,
   cleanup_enabled: false,
   cleanup_allowed_globs: [

@@ -24,16 +24,10 @@ import { PolicyExplainService } from "../services/policy-explain-service.js";
 import { FileWriter } from "../services/file-writer.js";
 import { WriteChangesService } from "../services/write-changes-service.js";
 import { WritePolicy } from "../services/write-policy.js";
-import { randomUUID } from "node:crypto";
 import { OperationReceiptService } from "../services/operation-receipt-service.js";
 import { RemoteGitService } from "../services/remote-git-service.js";
 import { AllowedScriptService } from "../services/allowed-script-service.js";
 import { BranchUpdateService } from "../services/branch-update-service.js";
-import { Ato001ClaudeStartService } from "../services/ato-001-claude-start-service.js";
-import { Ato001ClaudeReviewService } from "../services/ato-001-claude-review-service.js";
-import { Ato001ReadLease } from "../services/ato-001-read-lease.js";
-import { ATO001_REPO_ID } from "../services/ato-001-claude-profile.js";
-import { isMutatingToolName } from "./mutating-tools.js";
 import { createErrorEnvelope, createSuccessEnvelope } from "../runtime/result-envelope.js";
 import { toRepoReaderError } from "../runtime/errors.js";
 import { audit } from "../runtime/telemetry.js";
@@ -471,40 +465,6 @@ export const codexReviewHandler: ToolHandler = async (input, context) => safeToo
   );
 });
 
-export const startAto001ClaudeHandler: ToolHandler = async (input, context) => safeTool<Record<string, never>>("repo_start_ato_001_claude", input, context, async () => {
-  const repo = context.registry.get(ATO001_REPO_ID);
-  new OperationsPolicy(repo.operations).assertAto001ClaudeAllowed();
-  const result = await new Ato001ClaudeStartService(repo.root, process.cwd()).start({ call_id: randomUUID(), recorded_at: new Date().toISOString(), tool: "repo_start_ato_001_claude" });
-  audit({
-    tool: "repo_start_ato_001_claude",
-    repo_id: ATO001_REPO_ID,
-    paths: result.artifact_paths,
-    warnings: result.warnings
-  });
-  return createSuccessEnvelope(
-    result,
-    result.started ? "Started the fixed ATO-001 PKR-004 Claude transport." : "The fixed ATO-001 PKR-004 Claude transport reached a terminal startup state.",
-    { warnings: result.warnings }
-  );
-});
-
-export const ato001ClaudeReviewHandler: ToolHandler = async (input, context) => safeTool<Record<string, never>>("repo_ato_001_claude_review", input, context, async () => {
-  const repo = context.registry.get(ATO001_REPO_ID);
-  new OperationsPolicy(repo.operations).assertAto001ClaudeAllowed();
-  const result = await new Ato001ClaudeReviewService(repo.root, { artifactRoot: process.cwd() }).review({ call_id: randomUUID(), recorded_at: new Date().toISOString(), tool: "repo_ato_001_claude_review" });
-  audit({
-    tool: "repo_ato_001_claude_review",
-    repo_id: ATO001_REPO_ID,
-    paths: result.artifact_paths,
-    warnings: result.warnings
-  });
-  return createSuccessEnvelope(
-    result,
-    result.terminal ? "Collected the terminal fixed ATO-001 Claude result and released its read lease." : "The fixed ATO-001 Claude transport is still running.",
-    { warnings: result.warnings }
-  );
-});
-
 export const writeFileHandler: ToolHandler = async (input, context) => safeTool<WriteFileInput>("repo_write_file", input, context, async (args) => {
   const repo = context.registry.get(args.repo_id);
   const sandbox = new PathSandbox(repo.root);
@@ -600,12 +560,7 @@ async function safeTool<TInput extends Record<string, unknown>>(
   run: (args: TInput) => Promise<CallToolResult>
 ): Promise<CallToolResult> {
   try {
-    const args = input as TInput;
-    const repoId = typeof input === "object" && input && "repo_id" in input ? String(input.repo_id) : undefined;
-    if (repoId === ATO001_REPO_ID && isMutatingToolName(tool) && tool !== "repo_start_ato_001_claude") {
-      return await new Ato001ReadLease(process.cwd()).withMutationGuard(() => run(args));
-    }
-    return await run(args);
+    return await run(input as TInput);
   } catch (error) {
     audit({ tool, repo_id: typeof input === "object" && input && "repo_id" in input ? String(input.repo_id) : undefined, warnings: [toRepoReaderError(error).code] });
     return createErrorEnvelope(toRepoReaderError(error));

@@ -5,8 +5,6 @@ import {
   changePlanHandler,
   cleanupPathsHandler,
   codexReviewHandler,
-  startAto001ClaudeHandler,
-  ato001ClaudeReviewHandler,
   decisionMemoryHandler,
   fetchFileHandler,
   gitCommitHandler,
@@ -462,24 +460,6 @@ export const toolCatalog: ToolDefinition[] = [
     outputSchema: toolContracts.repo_codex_review.output,
     annotations: readOnlyAnnotations,
     handler: codexReviewHandler
-  },
-  {
-    name: "repo_start_ato_001_claude",
-    title: "Start fixed ATO-001 Claude spike",
-    description: descriptions.repo_start_ato_001_claude,
-    inputSchema: toolContracts.repo_start_ato_001_claude.input,
-    outputSchema: toolContracts.repo_start_ato_001_claude.output,
-    annotations: writeAnnotations,
-    handler: startAto001ClaudeHandler
-  },
-  {
-    name: "repo_ato_001_claude_review",
-    title: "Review fixed ATO-001 Claude result",
-    description: descriptions.repo_ato_001_claude_review,
-    inputSchema: toolContracts.repo_ato_001_claude_review.input,
-    outputSchema: toolContracts.repo_ato_001_claude_review.output,
-    annotations: readOnlyAnnotations,
-    handler: ato001ClaudeReviewHandler
   },
   {
     name: "repo_write_file",

@@ -9,7 +9,6 @@ export const MUTATING_TOOL_NAMES = [
   "repo_write_handoff",
   "repo_write_codex_task",
   "repo_start_codex_task",
-  "repo_start_ato_001_claude",
   "repo_git_stage",
   "repo_git_unstage",
   "repo_git_restore_paths",

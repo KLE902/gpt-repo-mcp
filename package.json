@@ -45,7 +45,7 @@
     "list": "node dist/cli/connect-gpt.js list",
     "check:config": "node dist/cli/connect-gpt.js check",
     "doctor": "npm run build && node dist/cli/connect-gpt.js doctor",
-    "build": "tsup src/server.ts --format esm --dts --clean && tsup src/cli/connect-gpt.ts src/cli/ato-001-operation.ts --format esm --out-dir dist/cli",
+    "build": "tsup src/server.ts --format esm --dts --clean && tsup src/cli/connect-gpt.ts --format esm --out-dir dist/cli",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

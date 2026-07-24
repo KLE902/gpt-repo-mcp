@@ -81,6 +81,7 @@ The PKR repository remains the consumer and dogfooding environment. GPT Repo MCP
 - [`BASELINE_EVIDENCE.md`](BASELINE_EVIDENCE.md) — mechanically checkable repository, pull-request, test, and PKR-state evidence that supports ratification.
 - [`ATO-001.md`](ATO-001.md) — ratified bounded Phase 0.5 Claude transport work package.
 - [`ATO-001-SPIKE-EVIDENCE.md`](ATO-001-SPIKE-EVIDENCE.md) — implementation, component-validation, measured transport, and final spike evidence kept explicitly separate.
+- [`CLAUDE-CLI-TURN-DIAGNOSTIC.md`](CLAUDE-CLI-TURN-DIAGNOSTIC.md) — draft, non-ratified synthetic diagnostic for reliable `--max-turns` enforcement and actual envelope discovery.
 
 ## Permanent non-goals
 

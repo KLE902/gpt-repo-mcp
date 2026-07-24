@@ -23,7 +23,6 @@ import { SearchInputSchema, SearchResponseSchema } from "../contracts/search.con
 import { TaskInventoryInputSchema, TaskInventoryResultSchema } from "../contracts/task.contract.js";
 import { RepoTreeResultSchema } from "../contracts/tree.contract.js";
 import { WriteChangesInputSchema, WriteChangesResultSchema, WriteFileInputSchema, WriteFileResultSchema } from "../contracts/write.contract.js";
-import { Ato001ClaudeReviewInputSchema, Ato001ClaudeReviewResultSchema, Ato001ClaudeStartInputSchema, Ato001ClaudeStartResultSchema } from "../contracts/ato-001-claude.contract.js";
 
 export type ToolName =
   | "repo_list_roots"
@@ -72,8 +71,6 @@ export type ToolName =
   | "repo_write_codex_task"
   | "repo_start_codex_task"
   | "repo_codex_review"
-  | "repo_start_ato_001_claude"
-  | "repo_ato_001_claude_review"
   | "repo_write_file"
   | "repo_write_changes"
   | "repo_write_handoff";
@@ -267,14 +264,6 @@ export const toolContracts = {
   repo_codex_review: {
     input: CodexReviewInputSchema,
     output: CodexReviewResultSchema
-  },
-  repo_start_ato_001_claude: {
-    input: Ato001ClaudeStartInputSchema,
-    output: Ato001ClaudeStartResultSchema
-  },
-  repo_ato_001_claude_review: {
-    input: Ato001ClaudeReviewInputSchema,
-    output: Ato001ClaudeReviewResultSchema
   },
   repo_write_file: {
     input: WriteFileInputSchema,
