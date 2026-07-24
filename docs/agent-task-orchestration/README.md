@@ -79,6 +79,8 @@ The PKR repository remains the consumer and dogfooding environment. GPT Repo MCP
 - [`OPERATING_MODEL.md`](OPERATING_MODEL.md) — roles, interim PKR need intake, specification refinement, Architecture Review, implementation review, decision records, and stop rules.
 - [`DELIVERY_PLAN.md`](DELIVERY_PLAN.md) — phased implementation, transport spike, exit criteria, measured gates, and deferred capabilities.
 - [`BASELINE_EVIDENCE.md`](BASELINE_EVIDENCE.md) — mechanically checkable repository, pull-request, test, and PKR-state evidence that supports ratification.
+- [`ATO-001.md`](ATO-001.md) — ratified bounded Phase 0.5 Claude transport work package.
+- [`ATO-001-SPIKE-EVIDENCE.md`](ATO-001-SPIKE-EVIDENCE.md) — implementation, component-validation, measured transport, and final spike evidence kept explicitly separate.
 
 ## Permanent non-goals
 

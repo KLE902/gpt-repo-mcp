@@ -1,4 +1,8 @@
 export const descriptions = {
+  repo_start_ato_001_claude:
+    "Use this when the owner explicitly starts the ratified ATO-001 PKR-004 Claude transport measurement. It accepts no parameters and owns the exact prompt, repository, Git, context, Claude, read-only invocation, runtime, output, artifact, and live-worktree lease boundaries.",
+  repo_ato_001_claude_review:
+    "Use this when collecting or reviewing the fixed ATO-001 PKR-004 Claude transport result. It accepts no parameters, revalidates every repository and context boundary, returns invalid output only as diagnostic evidence, and releases the persistent read lease after terminal review.",
   repo_list_roots:
     "Use this when the user asks which approved repositories are available. Does not read file contents.",
   repo_policy_explain:

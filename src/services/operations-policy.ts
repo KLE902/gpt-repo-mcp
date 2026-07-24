@@ -33,6 +33,7 @@ export type OperationsPolicyConfig = {
   codex_task_max_runtime_ms?: number;
   codex_task_max_output_bytes?: number;
   codex_task_inherit_env?: string[];
+  claude_ato_001_enabled?: boolean;
   max_paths_per_operation?: number;
   cleanup_enabled?: boolean;
   cleanup_allowed_globs?: string[];
@@ -56,6 +57,7 @@ export type EffectiveOperationsPolicy = {
   codex_task_max_runtime_ms: number;
   codex_task_max_output_bytes: number;
   codex_task_inherit_env: string[];
+  claude_ato_001_enabled: boolean;
   max_paths_per_operation: number;
   cleanup_enabled: boolean;
   cleanup_allowed_globs: string[];
@@ -83,6 +85,7 @@ export class OperationsPolicy {
       codex_task_max_runtime_ms: config.codex_task_max_runtime_ms ?? DEFAULT_OPERATIONS_POLICY.codex_task_max_runtime_ms,
       codex_task_max_output_bytes: config.codex_task_max_output_bytes ?? DEFAULT_OPERATIONS_POLICY.codex_task_max_output_bytes,
       codex_task_inherit_env: [...(config.codex_task_inherit_env ?? DEFAULT_OPERATIONS_POLICY.codex_task_inherit_env)],
+      claude_ato_001_enabled: config.claude_ato_001_enabled ?? DEFAULT_OPERATIONS_POLICY.claude_ato_001_enabled,
       max_paths_per_operation: config.max_paths_per_operation ?? DEFAULT_OPERATIONS_POLICY.max_paths_per_operation,
       cleanup_enabled: config.cleanup_enabled ?? DEFAULT_OPERATIONS_POLICY.cleanup_enabled,
       cleanup_allowed_globs: config.cleanup_allowed_globs ?? [...DEFAULT_OPERATIONS_POLICY.cleanup_allowed_globs]
@@ -153,6 +156,13 @@ export class OperationsPolicy {
       max_output_bytes: this.config.codex_task_max_output_bytes,
       inherit_env: [...this.config.codex_task_inherit_env]
     };
+  }
+
+  assertAto001ClaudeAllowed(): void {
+    this.assertEnabled();
+    if (!this.config.claude_ato_001_enabled) {
+      throw new RepoReaderError("ATO001_CLAUDE_DISABLED", "The fixed ATO-001 Claude transport spike is disabled for this repository.");
+    }
   }
 
   assertRestoreAllowed(paths: string[]): void {
