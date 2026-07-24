@@ -30,7 +30,9 @@ The candidate task bytes were verified as UTF-8 with no prefix, suffix, normaliz
 
 The spike branch initially implemented fixed start and review operations, a fixed Claude invocation, an MCP-owned artifact set, semantic result parsing, and a live-worktree read lease. Those mechanisms were implementation candidates, not validated production capability.
 
-The final PR tree removes all executable runtime content and disconnects the MCP surface, compatibility operation, policy toggle, fixed task content, parser, lease, and active spike tests. The bounded repository writer used for this correction cannot delete tracked paths: ten branch-created runtime paths therefore remain as zero-byte inert files, and two branch-created test paths contain only skipped retirement markers. The implementation history remains available in the branch commits and in this evidence record. No active or latent ATO-001 Claude runner is delivered by PR #23.
+The final PR tree removes all executable runtime content and disconnects the MCP surface, compatibility operation, policy toggle, fixed task content, parser, lease, and active spike tests. The bounded repository writer used for this correction cannot delete tracked paths: ten branch-created runtime paths therefore remain as zero-byte inert files, and two branch-created test paths contain only skipped retirement markers. No active or latent ATO-001 Claude runner is delivered by PR #23.
+
+PR #23 is a six-commit branch, not a two-commit correction in isolation. Its complete review history consists of `742b9e4c1c9216e90641254479ed6fcf2b7f6afd`, `282bb0a5fd367746d6a427578167bb730d3d7193`, `ecd0d1482a181cc79b4fb25a05112cffd32388e2`, `f6dec4fd939040d0beb16b5c459341bcaddff6fa`, `ae14920a7fd4c377413afa66c207eb5daac3e25b`, and `2255c1b153f282c786a97430f6370bf85b300ceb`. The last two commits correct and retire the earlier spike implementation; they do not erase the four preceding implementation, repair, and evidence commits. Review and merge must therefore evaluate the complete branch diff and commit history. A squash merge may condense the commits on `main`, but the PR record remains the historical evidence trail.
 
 ## Implementation and component activity
 
@@ -154,6 +156,8 @@ This observation is deliberately limited:
 - it produced no intake-valid PKR result;
 - it did not preserve the raw provider envelope, full executable resolution, exit-code record, stdout/stderr hashes, or artifact manifest as a durable audit package;
 - it may be used only to reject help text as the sole capability gate.
+
+The probe script id was a generic entry in PKR's local ignored operations policy, not part of the ATO-001 runtime or the public repository tree. Final review found that `pkr.agent.claude.probe` remained allowlisted after the probe. Its entry was removed from local `config.local.json`, the MCP runtime was restarted, and the reloaded effective PKR policy no longer lists that script id. This is an operational retirement of the local installation, not a Git-delivered control and not evidence about other installations.
 
 ## Measurement record
 
